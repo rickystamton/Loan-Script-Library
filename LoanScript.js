@@ -579,7 +579,7 @@ class BalanceManager {
         const periodNum = rowArr[0];   // Period number (col B)
         const periodEnd = rowArr[1];   // Period end date (col C)
 
-        **// *** CHANGED: Initialize tracker for unscheduled principal paid in this period**
+        // *** CHANGED: Initialize tracker for unscheduled principal paid in this period**
         let unscheduledPrincipalPaidThisPeriod = 0;
 
         // Determine total days in this period (especially for 30/360 convention)
@@ -642,7 +642,7 @@ class BalanceManager {
             runningPrincipal = Math.max(0, runningPrincipal - principalPdU);
             runningFees      = Math.max(0, runningFees - feesPdU);
 
-            **// *** CHANGED: Record any unscheduled principal payment for re-amortization trigger**
+            // *** CHANGED: Record any unscheduled principal payment for re-amortization trigger**
             if (principalPdU > 0) {
                 unscheduledPrincipalPaidThisPeriod += principalPdU;
             }
@@ -744,7 +744,7 @@ class BalanceManager {
         runningFees      = Math.max(0, runningFees - feesPd);
         rowArr[6] = principalPd + interestPd + feesPd;  // col H: Total Paid in this period
 
-        **// *** CHANGED: Trigger re-amortization of future payments if any principal was paid (scheduled or unscheduled)**
+        // *** CHANGED: Trigger re-amortization of future payments if any principal was paid (scheduled or unscheduled)**
         if (
             isMonthly &&
             !isSinglePeriod &&
