@@ -133,13 +133,13 @@ After inputting the payment details, run the recalculation function (`recalcLoan
     **Note:** To record an unscheduled payment (prepayment), insert a new row in the schedule (leave the Period column blank) and fill in the Paid On date along with the Principal/Interest/Fees Paid for that entry. The script will recognize these as prepayments and incorporate them (in chronological order by Paid On date) when recalculating balances.
 ---
 
-# Handling Unscheduled Payments in Different Loan Scenarios
+## Handling Unscheduled Payments in Different Loan Scenarios
 
 Unscheduled payment rows (inserted with the **Period** column blank) let you record extra payments outside the regular schedule. The script will recognize these entries and apply them as prepayments or out-of-sequence payments. Below we explain how unscheduled **Interest Paid**, **Principal Paid**, and **Fees Paid** affect the loan’s balances and future payments in various scenarios, and the role of the **Paid On** date in each case.
 
 ---
 
-## 1. Single Period Loans (One-Time Payment at Maturity)
+### 1. Single Period Loans (One-Time Payment at Maturity)
 
 - **Interest Paid:**  
   If you enter an interest amount in an unscheduled row for a single-period loan, it immediately reduces the accrued interest balance. The code subtracts any Interest Paid from the running interest due​ GITHUB.COM. This means you’re paying off interest before the maturity date, so less (or no) interest remains to be paid at final maturity. In effect, interest paid early stops interest from accumulating further on that portion.
@@ -155,7 +155,7 @@ Unscheduled payment rows (inserted with the **Period** column blank) let you rec
 
 ---
 
-## 2. Monthly Loans with Periodic Day Count (30/360) – Non-Amortizing/Interest-Only
+### 2. Monthly Loans with Periodic Day Count (30/360) – Non-Amortizing/Interest-Only
 
 - **Interest Paid:**  
   In a monthly loan using a 30/360 convention, interest is typically calculated on a fixed 30-day period. If you record an Interest Paid in an unscheduled row, the script subtracts that amount from any interest balance immediately​ GITHUB.COM. This is usually only relevant if interest from a previous period was unpaid – the unscheduled payment would then clear that owed interest. Paying interest outside the normal schedule doesn’t change future scheduled interest charges (those will still accrue on the remaining principal each period), but it does ensure no past interest is carrying forward. Essentially, you’re catching up on interest so that the interest balance is brought to $0$, preventing accumulation of unpaid interest.
@@ -171,7 +171,7 @@ Unscheduled payment rows (inserted with the **Period** column blank) let you rec
 
 ---
 
-## 3. Monthly Loans with Actual Day Count (365/Actual days) – Non-Amortizing/Interest-Only
+### 3. Monthly Loans with Actual Day Count (365/Actual days) – Non-Amortizing/Interest-Only
 
 - **Interest Paid:**  
   For a monthly loan that uses actual day counts, interest accrues day by day. When you add an unscheduled Interest Paid entry, the script immediately deducts that from any accumulated interest balance​ GITHUB.COM. If there was unpaid interest from a prior period (say you missed or underpaid a scheduled interest payment), this extra payment will reduce or clear that outstanding interest. Paying interest early (before the normal due date) in an actual day-count loan isn’t common since interest is typically paid as it accrues each period, but the option exists to remove any interest that’s hanging out in the balance. Once paid, that interest stops accruing (the script’s running interest balance is set to zero or lower) so you won’t be charged interest on it later (note: the script doesn’t compound interest on overdue interest – it keeps it separate as an interest balance).
@@ -187,7 +187,7 @@ Unscheduled payment rows (inserted with the **Period** column blank) let you rec
 
 ---
 
-## 4. Fully Amortizing Monthly Loans (Amortize = "Yes") – Actual or Periodic Day Count
+### 4. Fully Amortizing Monthly Loans (Amortize = "Yes") – Actual or Periodic Day Count
 
 - **Interest Paid:**  
   In a fully amortizing loan, each scheduled payment is supposed to cover that period’s interest in full (plus some principal). Therefore, an unscheduled Interest Paid is usually only needed if there was interest that went unpaid in a prior period. If you do input an Interest Paid in an unscheduled row, the script will immediately apply it to reduce the interest balance​ GITHUB.COM. This could happen if, for example, a scheduled payment was missed or short-paid and interest accrued into the next period – an extra payment can then be made to pay off that lingering interest. Once applied, the running interest is decreased, ensuring that no old interest remains to hinder the amortization. In normal cases (payments made in full), there wouldn’t be an interest balance to pay outside the schedule, so this field is less commonly used for amortizing scenarios except to correct a deficit.
@@ -206,7 +206,7 @@ Unscheduled payment rows (inserted with the **Period** column blank) let you rec
 
 ---
 
-## Summary of Unscheduled Payment Effects
+### Summary of Unscheduled Payment Effects
 
 - **Interest Paid (unscheduled):**  
   Always reduces the accumulated interest balance immediately​ GITHUB.COM. This prevents interest from remaining unpaid. It’s most impactful if interest was accrued from missed payments or in between scheduled dates; once paid, that interest is no longer owed and won’t appear in future due amounts. It does not prepay future interest – it only pays off interest that has accrued up to the payment date (or was scheduled up to that point).
