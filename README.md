@@ -130,7 +130,7 @@ After inputting the payment details, run the recalculation function (`recalcLoan
 - **Interest Balance (Col O)**  
   Updated to any interest that has accrued but remains unpaid (carried forward if the payment didn’t cover all interest due).
 
-**Note:** To record an unscheduled payment (prepayment), insert a new row in the schedule (leave the Period column blank) and fill in the Paid On date along with the Principal/Interest/Fees Paid for that entry. The script will recognize these as prepayments and incorporate them (in chronological order by Paid On date) when recalculating balances.
+    **Note:** To record an unscheduled payment (prepayment), insert a new row in the schedule (leave the Period column blank) and fill in the Paid On date along with the Principal/Interest/Fees Paid for that entry. The script will recognize these as prepayments and incorporate them (in chronological order by Paid On date) when recalculating balances.
 ---
 
 # Handling Unscheduled Payments in Different Loan Scenarios
