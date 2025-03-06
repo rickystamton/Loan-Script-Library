@@ -105,21 +105,33 @@ After entering the inputs on a loan sheet:
      ```
    - Reload your spreadsheet to see the **Loan Tools** menu.
 
- # Recording and Tracking Repayments
+ ## Recording and Tracking Repayments
 
-As time passes, you can update the schedule with actual payment data:
+As time passes, record actual payments in your schedule by updating key fields:
 
-- **Paid On (Col F)**: Enter the actual payment date.
-- **Total Paid (Col H)**: Enter the amount paid.
+- **Paid On (Col F)**  
+  Enter the actual payment date. For scheduled payment rows (those with a period number), this records when the due payment was made (leave it blank if a payment hasn’t occurred yet). For unscheduled payments (new rows with a blank Period), this date indicates when the extra payment occurred.
 
-After updating, run the recalculation function (`recalcLoanSchedule()`) to update:
-- **Interest Paid (Col L)**
-- **Principal Paid (Col J)**
-- **Principal Balance (Col P)**
-- **Interest Balance (Col O)**
+- **Principal Paid (Col J) / Interest Paid (Col L) / Fees Paid (Col N)**  
+  Enter the amounts of the payment applied to principal, interest, and any fees, respectively.  
+  **Note:** Do not enter a combined “Total Paid” amount. The script will automatically calculate Total Paid (Col H) as the sum of these values.
 
-*Note:* You can add unscheduled payments by inserting a new row (leave the Period column blank) and entering the payment details. The script will recognize and apply these as prepayments.
+After inputting the payment details, run the recalculation function (`recalcLoanSchedule()`). This will refresh the schedule to reflect the payments:
 
+- **Payment Due (Col G)**  
+  Recalculated for each period based on the accrued interest and any fees for that period.
+
+- **Total Paid (Col H)**  
+  Automatically updated to equal Principal + Interest + Fees Paid for that row.
+
+- **Principal Balance (Col P)**  
+  Adjusted to the remaining principal after the payment.
+
+- **Interest Balance (Col O)**  
+  Updated to any interest that has accrued but remains unpaid (carried forward if the payment didn’t cover all interest due).
+
+**Note:** To record an unscheduled payment (prepayment), insert a new row in the schedule (leave the Period column blank) and fill in the Paid On date along with the Principal/Interest/Fees Paid for that entry. The script will recognize these as prepayments and incorporate them (in chronological order by Paid On date) when recalculating balances.
+---
 # Using the Summary Sheet (Optional)
 
 If you manage multiple loan sheets, a **Summary** sheet can provide an overview:
