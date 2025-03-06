@@ -114,7 +114,7 @@ As time passes, record actual payments in your schedule by updating key fields:
 
 - **Principal Paid (Col J) / Interest Paid (Col L) / Fees Paid (Col N)**  
   Enter the amounts of the payment applied to principal, interest, and any fees, respectively.  
-  **Note:** Do not enter a combined “Total Paid” amount. The script will automatically calculate Total Paid (Col H) as the sum of these values.
+- **Note:** Do not enter a combined “Total Paid” amount. The script will automatically calculate Total Paid (Col H) as the sum of these values.
 
 After inputting the payment details, run the recalculation function (`recalcLoanSchedule()`). This will refresh the schedule to reflect the payments:
 
