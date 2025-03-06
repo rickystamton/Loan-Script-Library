@@ -220,7 +220,7 @@ Unscheduled payment rows (inserted with the **Period** column blank) let you rec
 - **Paid On date:**  
   The Paid On date is critical for every unscheduled entry. It ensures the payment is integrated into the timeline of the loan. The script processes unscheduled payments in chronological order​ GITHUB.COM alongside scheduled periods. By providing the date, you let the script accrue interest correctly up to that point and then apply the payment. The result is an accurate reflection of the loan’s state after the payment: interest is calculated only for the time it was actually outstanding, and principal/fee balances are updated when they should be. If you omit the Paid On date, the script will not know when to apply the payment – effectively the payment would either be ignored in the interim calculations or treated as happening at the end, yielding no benefit in reducing interest or balances until the loan’s end. Always include a Paid On date for unscheduled payments to get the intended outcome in the amortization schedule.
 
-# Using the Summary Sheet (Optional)
+## Using the Summary Sheet (Optional)
 
 If you manage multiple loan sheets, a **Summary** sheet can provide an overview:
 
@@ -236,7 +236,7 @@ If you manage multiple loan sheets, a **Summary** sheet can provide an overview:
 
 Use the **Summary Tools** menu (added via an onOpen trigger) to populate and update this summary.
 
-# Customization
+## Customization
 
 The Loan Script Library is designed to be flexible:
 
@@ -250,7 +250,7 @@ The Loan Script Library is designed to be flexible:
 
 Always test any customizations on a copy of your data to ensure the script works as expected.
 
-# Example Usage
+## Example Usage
 
 **Scenario:**
 - **Loan Amount**: $10,000
@@ -270,11 +270,11 @@ Always test any customizations on a copy of your data to ensure the script works
 - **Monthly Calculations**: Interest is computed for each period. In the final period, the principal plus exit fee is due.
 - **Payment Tracking**: Record payments as they occur. If a payment is missed or partial, update the **Paid On** and **Total Paid** fields, then run recalculation to adjust the remaining balances.
 
-# Contributing
+## Contributing
 
 This project is **not open** for external contributions. It is provided as a library for personal or internal use. You are welcome to fork the repository and modify the code for your own needs. Bug reports or suggestions via GitHub issues are accepted, but there is no formal process for contributions.
 
-# License
+## License
 
 This project is licensed under the **MIT License**. You are free to use, modify, and distribute the code as permitted by the license. The software is provided "as is" without warranty of any kind, and the author is not liable for any claims or damages arising from its use.
 
