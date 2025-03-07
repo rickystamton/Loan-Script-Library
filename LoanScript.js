@@ -982,6 +982,7 @@ function createLoanScheduleMenu(){
     .addItem('Insert Unscheduled Payment Row', 'insertUnscheduledPaymentRow')
     .addItem('Generate Loan Schedule', 'generateLoanSchedule')
     .addItem('Set Up Triggers', 'setupTriggers')
+    .addItem('Recalculate Schedule', 'recalcAll')
     .addToUi();
 }
 
