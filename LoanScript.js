@@ -754,7 +754,7 @@ class BalanceManager {
         ) {
             // Recalculate remaining schedule based on new remaining principal
             const leftoverPrincipal = runningPrincipal;
-            const leftoverStartRow = rowIndex + 1;
+            const leftoverStartRow = rowIndex;  // include current period for recast (was rowIndex + 1)
             let lastFutureRow = leftoverStartRow;
             // Find the range of future scheduled rows to update
             while (lastFutureRow < lastUsedRowIndex) {
@@ -762,7 +762,7 @@ class BalanceManager {
                 if (!pVal && pVal !== 0) break;  // stop at first blank row
                 lastFutureRow++;
             }
-            const periodsLeft = params.termMonths - Math.floor(periodNum);
+            const periodsLeft = params.termMonths - Math.floor(periodNum) + 1;  // include current period in remaining count
             if (periodsLeft > 0) {
                 this.reAmortizeFutureRows(
                     allRows,
@@ -774,7 +774,23 @@ class BalanceManager {
                     hasReAmortized
                 );
             }
+            // **NEW:** Absorb any partial-period interest into the next scheduled payment
+            if (unscheduledPrincipalPaidThisPeriod > 0) {
+              // interestAccruedThisRow is the interest from the last payment date up to this period’s end
+              const interestAdj = interestAccruedThisRow - (allRows[rowIndex][9] || 0);
+              if (interestAdj > 0) {
+                  // Increase current period’s interest due by the accrued partial-period interest
+                  allRows[rowIndex][9] += interestAdj;  // col K: Interest Due
+                  // Decrease principal due by the same amount to keep total payment constant
+                  allRows[rowIndex][7] = Math.max(0, (allRows[rowIndex][7] || 0) - interestAdj);  // col I: Principal Due
+                  // Update total due (col G) for the current period
+                  allRows[rowIndex][5] = (allRows[rowIndex][7] || 0) 
+                                        + (allRows[rowIndex][9] || 0) 
+                                        + (allRows[rowIndex][11] || 0);
+              }
+          }
         }
+        
 
         // Write out ending balances for this period (Interest, Principal, Total remaining)
         rowArr[13] = runningInterest; 
