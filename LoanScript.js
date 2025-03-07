@@ -976,6 +976,14 @@ class RowManager {
 // ---------------------
 // 6) UI & TRIGGERS
 // ---------------------
+
+function recalcAll() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (!sheet) return;
+  const bal = new BalanceManager(sheet);
+  bal.recalcAll();
+}
+
 function createLoanScheduleMenu(){
   var ui = SpreadsheetApp.getUi();
   ui.createMenu('Loan Schedule Tools')
