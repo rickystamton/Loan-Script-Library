@@ -750,11 +750,11 @@ class BalanceManager {
             !isSinglePeriod &&
             !isUnscheduledRow(rowArr) &&         // ensure this is a scheduled row
             params.amortizeYN === "Yes" &&
-            (principalPd > 0 || unscheduledPrincipalPaidThisPeriod > 0)
+            unscheduledPrincipalPaidThisPeriod > 0    // only recast if an extra principal payment occurred this period
         ) {
             // Recalculate remaining schedule based on new remaining principal
             const leftoverPrincipal = runningPrincipal;
-            const leftoverStartRow = rowIndex;  // include current period for recast (was rowIndex + 1)
+            const leftoverStartRow = rowIndex + 1;
             let lastFutureRow = leftoverStartRow;
             // Find the range of future scheduled rows to update
             while (lastFutureRow < lastUsedRowIndex) {
@@ -762,7 +762,7 @@ class BalanceManager {
                 if (!pVal && pVal !== 0) break;  // stop at first blank row
                 lastFutureRow++;
             }
-            const periodsLeft = params.termMonths - Math.floor(periodNum) + 1;  // include current period in remaining count
+            const periodsLeft = params.termMonths - Math.floor(periodNum);
             if (periodsLeft > 0) {
                 this.reAmortizeFutureRows(
                     allRows,
