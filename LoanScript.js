@@ -780,7 +780,7 @@ class BalanceManager {
             !isSinglePeriod &&
             !isUnscheduledRow(rowArr) &&         // ensure this is a scheduled row
             params.amortizeYN === "Yes" &&
-            (principalPd > 0 || unscheduledPrincipalPaidThisPeriod > 0)
+            (unscheduledPrincipalPaidThisPeriod > 0)
         ) {
             // Recalculate remaining schedule based on new remaining principal
             const leftoverPrincipal = runningPrincipal;
