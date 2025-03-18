@@ -194,7 +194,7 @@ To use the wrapper properly, follow these guidelines:
 #### 5. Optional – Set Up Automated Triggers
 
 - **Automate Functions:**  
-  For convenience, the wrapper provides a “Set Up Triggers” function accessible via the custom menu. Running this will configure Google Apps Script triggers to automate the running of certain functions at specified times or events.
+  For convenience, the wrapper provides a “Set Up Triggers” function accessible via the custom menu. Running this will configure Google Apps Script triggers to automate the running of certain functions at specified times or events. **Important: Only run this function once. Running it multiple times will result in duplicate triggers that will need to be removed via **Extensions > Apps Script > Triggers** in your Google Sheet’s script project.**
 
 - **Examples of Automated Tasks:**  
   For example, the wrapper can install an onEdit trigger to run `onEdit()` (or other maintenance tasks) on your loan sheets. This is useful if you want your loan schedule to update automatically (e.g., updating interest calculations daily or refreshing the summary sheet regularly) without manual intervention.

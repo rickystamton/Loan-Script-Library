@@ -703,22 +703,45 @@ class BalanceManager {
         }
         else if (isMonthly && params.amortizeYN === "Yes" && Number.isInteger(periodNum) && periodNum >= 1 && periodNum <= params.termMonths) {
             // Amortizing monthly loan: use amortized schedule unless already adjusted
-            if (!hasReAmortized[rowIndex]) {
-                // Not yet re-amortized: apply original amortization split (IPMT/PPMT)
-                runningInterest = Math.max(0, runningInterest - interestAccruedThisRow);
-                const scheduledInt = ipmtMap[rowIndex] || 0;
-                const scheduledPr  = ppmtMap[rowIndex] || 0;
-                runningInterest += scheduledInt;
-                newInterestDue   = scheduledInt;
-                newPrincipalDue  = scheduledPr;
-            } else {
-                // Already re-amortized: use the values stored in this row (from prior recalculation)
-                runningInterest = Math.max(0, runningInterest - interestAccruedThisRow);
-                newInterestDue  = rowArr[9] || 0;  // col K
-                newPrincipalDue = rowArr[7] || 0;  // col I
-                runningInterest += newInterestDue;
-            }
-        }
+            if (unscheduledPrincipalPaidThisPeriod > 0) {
+              // **FIX**: An unscheduled principal payment was made this period – recalc interest/principal for this payment
+              runningInterest = Math.max(0, runningInterest - interestAccruedThisRow);
+              // Determine the originally scheduled payment components (interest and principal) for this period:
+              let scheduledInt, scheduledPr;
+              if (!hasReAmortized[rowIndex]) {
+                  // If this period was on the original amortization plan
+                  scheduledInt = ipmtMap[rowIndex] || 0;
+                  scheduledPr  = ppmtMap[rowIndex] || 0;
+              } else {
+                  // If this period had been re-amortized by a prior prepayment, use the last known amounts
+                  scheduledInt = rowArr[9] || 0;  // prior Interest Due (col K)
+                  scheduledPr  = rowArr[7] || 0;  // prior Principal Due (col I)
+              }
+              const scheduledPayment = scheduledInt + scheduledPr;
+              // Use actual accrued interest for this period (lower due to prepayment) as the interest due
+              let actualInterest = interestAccruedThisRow;
+              if (actualInterest > scheduledPayment) actualInterest = scheduledPayment;  // cap to total payment (edge case)
+              newInterestDue  = actualInterest;
+              // Principal due is the rest of the payment after covering interest
+              newPrincipalDue = scheduledPayment - actualInterest;
+              // Add back the interest portion to runningInterest (which will be carried until paid)
+              runningInterest += newInterestDue;
+          } else if (!hasReAmortized[rowIndex]) {
+              // No prepayment this period, use original amortization split
+              runningInterest = Math.max(0, runningInterest - interestAccruedThisRow);
+              const scheduledInt = ipmtMap[rowIndex] || 0;
+              const scheduledPr  = ppmtMap[rowIndex] || 0;
+              runningInterest += scheduledInt;
+              newInterestDue  = scheduledInt;
+              newPrincipalDue = scheduledPr;
+          } else {
+              // Already re-amortized (and no new prepayment this period), use stored values
+              runningInterest = Math.max(0, runningInterest - interestAccruedThisRow);
+              newInterestDue  = rowArr[9] || 0;
+              newPrincipalDue = rowArr[7] || 0;
+              runningInterest += newInterestDue;
+          }
+      }
         else if (isMonthly && params.amortizeYN === "No" && Number.isInteger(periodNum) && periodNum === params.termMonths) {
             // Interest-only loan, final period: all remaining interest and principal due at end
             newInterestDue = runningInterest;
