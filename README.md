@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-The Loan Script Library is a **Google Apps Script** solution for **Google Sheets** that generates detailed loan amortization schedules and helps track loan repayments. It is designed to manage loans directly within a Google Sheet – calculating periodic interest and principal, handling fees, and updating balances as repayments are made. With this script, you can input loan parameters into a sheet and automatically produce a schedule of payments, interest accruals, and outstanding balances. It supports both fully amortizing loans and interest-only structures, and includes features for prorated first periods, origination fees, exit fees, and more. All data is stored in Google Sheets, allowing you to review and modify loan details easily.
+The Loan Script Library is a **Google Apps Script** solution for **Google Sheets** that generates detailed loan schedules and helps track loan repayments. It is designed to manage loans directly within a Google Sheet – calculating periodic interest and principal, handling fees, and updating balances as repayments are made. With this script, you can input loan parameters into a sheet and automatically produce a schedule of payments, interest accruals, and outstanding balances. It supports both fully amortizing loans and interest-only structures, and includes features for prorated first periods, origination fees, exit fees, and more. All data is stored in Google Sheets, allowing you to review and modify loan details easily.
 
 ## Features
 
-- **Amortization Schedule Generation**: Automatically creates a period-by-period loan schedule with columns for due dates, days in period, payment amounts, interest due, principal due, fees due, and remaining balances. The schedule supports monthly payments or a single lump-sum payment at maturity.
+- **Loan Schedule Generation**: Automatically creates a period-by-period loan schedule with columns for due dates, days in period, payment amounts, interest due, principal due, fees due, and remaining balances. The schedule supports monthly payments or a single lump-sum payment at maturity.
 - **Interest Calculation Options**: Supports both actual day count and 30-day periodic calculations. You can specify the day count method and set the days-per-year (e.g., 365 or 360) to control how interest is accrued.
 - **Interest-Only vs Amortizing Loans**: Toggle the *Amortize* parameter to generate either interest-only schedules (interest due each period and principal at the end) or fully amortizing schedules with equal periodic payments.
 - **Origination and Exit Fees**: Automatically includes an origination fee (financed into the principal) and an exit fee (due in the final period) in the schedule.
@@ -64,7 +64,7 @@ After running the script, the amortization schedule is populated starting from *
 1. **Open Your Google Sheet**: Create or open a sheet where you want to manage loans.
 2. **Access Apps Script**: Navigate to **Extensions > Apps Script**.
 3. **Add the Script**: Create a new script file and copy-paste the contents of `LoanScriptWrapper.js` from this repository.
-4. **Add the Library**: In Apps Script click on the + sign next to Libraries. Then paste this script ID into the Look Up box "1lfXARnO_beVQDAfErbGQUajgL7vuYWM9BGB9JmtR-JOrlPIlHSa4OgTP". Choose the most recent version and push "Add".
+4. **Add the Library**: In Apps Script click on the "+" sign next to Libraries. Then paste this script ID into the Look Up box "1lfXARnO_beVQDAfErbGQUajgL7vuYWM9BGB9JmtR-JOrlPIlHSa4OgTP". Choose the most recent version and push "Add".
 5. **Save the Project**.
 
 ### Setting Up Your Sheet
