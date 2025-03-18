@@ -63,8 +63,8 @@ After running the script, the amortization schedule is populated starting from *
 ### Installing the Script
 1. **Open Your Google Sheet**: Create or open a sheet where you want to manage loans.
 2. **Access Apps Script**: Navigate to **Extensions > Apps Script**.
-3. **Add the Script**: Create a new script file and copy-paste the contents of `LoanScript.js` from this repository.
-4. *(Optional)* **Add Summary Functionality**: Create another script file (e.g., `SummaryPage.js`) for the optional summary features.
+3. **Add the Script**: Create a new script file and copy-paste the contents of `LoanScriptWrapper.js` from this repository.
+4. **Add the Library**: In Apps Script click on the + sign next to Libraries. Then paste this script ID into the Look Up box "1lfXARnO_beVQDAfErbGQUajgL7vuYWM9BGB9JmtR-JOrlPIlHSa4OgTP". Choose the most recent version and push "Add".
 5. **Save the Project**.
 
 ### Setting Up Your Sheet
