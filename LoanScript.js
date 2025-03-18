@@ -730,9 +730,6 @@ class BalanceManager {
         // Interest-only monthly loan (non-final period): set monthly interest payment
         newInterestDue = interestAccruedThisRow;  // interest accrued this period
         newPrincipalDue = 0;                      // no principal due until final period
-        // Remove this period’s interest from running total, as it’s now due (paid)
-        runningInterest = Math.max(0, runningInterest - newInterestDue);
-
          } else {
             // Monthly interest-only (non-final) or other cases: interest will accrue and be handled elsewhere
             // (No principal due in regular periods if interest-only; interest handled via runningInterest)
