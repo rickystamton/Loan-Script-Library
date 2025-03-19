@@ -184,8 +184,6 @@ The library defines several classes to encapsulate the generation and recalculat
 **Constructor**
 
 ```js
-// Copy
-// Edit
 new LoanScheduleGenerator(sheet)
 ```
 
@@ -258,8 +256,6 @@ The function also handles adding special notes and fees: if an origination fee o
 **Constructor**
 
 ```js
-// Copy
-// Edit
 new BalanceManager(sheet)
 ```
 
@@ -309,8 +305,6 @@ new BalanceManager(sheet)
 **Constructor**
 
 ```js
-// Copy
-// Edit
 new RowManager(sheet)
 ```
 
