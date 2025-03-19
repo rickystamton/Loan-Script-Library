@@ -1021,6 +1021,7 @@ function createLoanScheduleMenu(){
     .addItem('Generate Loan Schedule', 'generateLoanSchedule')
     .addItem('Set Up Triggers', 'setupTriggers')
     .addItem('Recalculate Schedule', 'recalcAll')
+    .addItem('Recast Loan', 'recastLoan')
     .addToUi();
 }
 

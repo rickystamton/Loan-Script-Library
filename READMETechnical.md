@@ -1,4 +1,3 @@
-```markdown
 # LoanScript.js – Loan Schedule Library Core
 
 ## Overview:
