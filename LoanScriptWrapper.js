@@ -23,6 +23,11 @@ function recalcAll() {
   LoanScriptLibrary.recalcAll();
 }
 
+// Called (via the custom menu) to recast the loan schedule.
+function recastLoan() {
+  LoanScriptLibrary.recastLoan();
+}
+
 // Triggered on edits in the spreadsheet.
 function onEdit(e) {
   LoanScriptLibrary.onEdit(e);
