@@ -563,6 +563,7 @@ class BalanceManager {
     // 8) Iterate over each scheduled period in chronological order
     let unschedIndex = 0;
     let lastEndDate = params.closingDate;
+    let extraPaidOccurred = false;
     const isSinglePeriod = (params.paymentFreq === "Single Period");
     const isMonthly = (params.paymentFreq === "Monthly");
     const isPeriodicMethod = (params.dayCountMethod === "Periodic");
@@ -573,9 +574,12 @@ class BalanceManager {
         : params.monthlyRate;
     const dailyPeriodicRate = monthlyInterestFactor / 30;
     
-    scheduledRows.forEach(schObj => {
+    let loanPaidOff = false;
+
+    for (let i = 0; i < scheduledRows.length; i++) {
+        const schObj = scheduledRows[i];
         const rowIndex = schObj.rowIndex;
-        const rowArr   = schObj.rowData;
+        const rowArr = schObj.rowData;
         const periodNum = rowArr[0];   // Period number (col B)
         const periodEnd = rowArr[1];   // Period end date (col C)
 
@@ -726,6 +730,18 @@ class BalanceManager {
               newPrincipalDue = scheduledPayment - actualInterest;
               // Add back the interest portion to runningInterest (which will be carried until paid)
               runningInterest += newInterestDue;
+              extraPaidOccurred = true;
+          } else if (extraPaidOccurred) {
+              // Use original payment, adjust interest/principal due  
+              runningInterest = Math.max(0, runningInterest - interestAccruedThisRow);  
+              const scheduledInt = ipmtMap[rowIndex] || 0;  
+              const scheduledPr = ppmtMap[rowIndex] || 0;  
+              const scheduledPayment = scheduledInt + scheduledPr;  
+              let actualInterest = interestAccruedThisRow;  
+              if (actualInterest > scheduledPayment) actualInterest = scheduledPayment;  
+              newInterestDue = actualInterest;  
+              newPrincipalDue = scheduledPayment - actualInterest;  
+              runningInterest += newInterestDue; 
           } else if (!hasReAmortized[rowIndex]) {
               // No prepayment this period, use original amortization split
               runningInterest = Math.max(0, runningInterest - interestAccruedThisRow);
@@ -771,40 +787,13 @@ class BalanceManager {
         const feesPd      = rowArr[12] || 0;  // col N: Fees Paid
         runningInterest  = Math.max(0, runningInterest - interestPd);
         runningPrincipal = Math.max(0, runningPrincipal - principalPd);
+          if (runningPrincipal <= 1e-6) {
+            // Loan is fully repaid; no further scheduled periods needed
+            loanPaidOff = true;
+            break;
+        }
         runningFees      = Math.max(0, runningFees - feesPd);
         rowArr[6] = principalPd + interestPd + feesPd;  // col H: Total Paid in this period
-
-        // *** CHANGED: Trigger re-amortization of future payments if any principal was paid (scheduled or unscheduled)**
-        if (
-            isMonthly &&
-            !isSinglePeriod &&
-            !isUnscheduledRow(rowArr) &&         // ensure this is a scheduled row
-            params.amortizeYN === "Yes" &&
-            (unscheduledPrincipalPaidThisPeriod > 0)
-        ) {
-            // Recalculate remaining schedule based on new remaining principal
-            const leftoverPrincipal = runningPrincipal;
-            const leftoverStartRow = rowIndex + 1;
-            let lastFutureRow = leftoverStartRow;
-            // Find the range of future scheduled rows to update
-            while (lastFutureRow < lastUsedRowIndex) {
-                const pVal = allRows[lastFutureRow][0];
-                if (!pVal && pVal !== 0) break;  // stop at first blank row
-                lastFutureRow++;
-            }
-            const periodsLeft = params.termMonths - Math.floor(periodNum);
-            if (periodsLeft > 0) {
-                this.reAmortizeFutureRows(
-                    allRows,
-                    leftoverStartRow,
-                    lastFutureRow,
-                    periodsLeft,
-                    leftoverPrincipal,
-                    params,
-                    hasReAmortized
-                );
-            }
-        }
 
         // Write out ending balances for this period (Interest, Principal, Total remaining)
         rowArr[13] = runningInterest; 
@@ -812,9 +801,18 @@ class BalanceManager {
         rowArr[15] = runningInterest + runningPrincipal + runningFees;
         lastEndDate = periodEnd;   // move to next period
         hasReAmortized[rowIndex] = false;  // (flag remains false for this period itself)
-    });
+    }
 
-    // 9) (Optional) Handle any unscheduled payments after the final period (if needed)
+    // 9) Clear remaining scheduled rows if loan is fully paid off
+
+    if (loanPaidOff) {
+      for (let j = i; j < scheduledRows.length; j++) {
+          let futureRow = scheduledRows[j].rowData;
+          futureRow[7] = 0;  // Principal Due = 0
+          futureRow[9] = 0;  // Interest Due = 0
+          futureRow[5] = 0;  // Total Due = 0
+      }
+  }
 
     // 10) Write all updated rows back to the sheet
     scheduledRows.forEach(obj => { allRows[obj.rowIndex] = obj.rowData; });
@@ -1055,6 +1053,91 @@ function insertUnscheduledPaymentRow() {
   // Then recalc
   const bal = new BalanceManager(sheet);
   bal.recalcAll();
+}
+
+function recastLoan() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (!sheet || sheet.getName() === 'Summary') return;
+
+  const bal = new BalanceManager(sheet);
+  bal.recalcAll();
+
+  const params = getAllInputs(sheet);
+  if (params.amortizeYN !== "Yes" || params.paymentFreq !== "Monthly") return;
+
+  const range = sheet.getRange(
+    SHEET_CONFIG.START_ROW,
+    2, // Column B
+    SHEET_CONFIG.END_ROW - SHEET_CONFIG.START_ROW + 1,
+    17
+  );
+  let allRows = range.getValues();
+
+  let lastUsedRowIndex = 0;
+  for (let i = 0; i < allRows.length; i++) {
+    const periodVal = allRows[i][0]; // col B
+    if (periodVal === "" && periodVal !== 0) break;
+    lastUsedRowIndex++;
+  }
+  if (lastUsedRowIndex === 0) return;
+
+  const scheduledRows = [];
+  const unscheduledRows = [];
+  for (let i = 0; i < lastUsedRowIndex; i++) {
+    const rowArr = allRows[i];
+    const periodVal = rowArr[0];    // Period (col B)
+    const periodEnd = rowArr[1];    // Period End Date (col C)
+    const paidOnVal = rowArr[4];    // Paid On Date (col F)
+    const isScheduled = (
+      Number.isInteger(periodVal) &&
+      periodEnd instanceof Date &&
+      !isNaN(periodEnd)
+    );
+    const isUnscheduled = (
+      !Number.isInteger(periodVal) &&
+      paidOnVal instanceof Date &&
+      !isNaN(paidOnVal)
+    );
+    if (isScheduled) {
+      scheduledRows.push({ rowIndex: i, rowData: rowArr });
+    } else if (isUnscheduled) {
+      unscheduledRows.push({ rowIndex: i, rowData: rowArr });
+    }
+  }
+
+  scheduledRows.sort((a, b) => a.rowData[1] - b.rowData[1]);
+  unscheduledRows.sort((a, b) => a.rowData[4] - b.rowData[4]);
+
+  let recastIndex = -1;
+  for (let i = 0; i < scheduledRows.length; i++) {
+    const rowArr = scheduledRows[i].rowData;
+    const lastTotalPaid = rowArr[6] || 0;
+    const lastTotalDue = rowArr[5] || 0;
+    if (lastTotalPaid <= lastTotalDue) {
+      recastIndex = i;
+      break;
+    }
+  }
+  if (recastIndex < 0) return;
+
+  const leftoverPrincipal = scheduledRows[recastIndex].rowData[14];
+  const leftoverCount = scheduledRows.length - recastIndex;
+  const hasReAmortized = new Array(lastUsedRowIndex).fill(false);
+
+  bal.reAmortizeFutureRows(
+    allRows,
+    recastIndex,
+    lastUsedRowIndex,
+    leftoverCount,
+    leftoverPrincipal,
+    params,
+    hasReAmortized
+  );
+
+  scheduledRows.forEach(obj => { allRows[obj.rowIndex] = obj.rowData; });
+  unscheduledRows.forEach(obj => { allRows[obj.rowIndex] = obj.rowData; });
+  range.offset(0, 0, lastUsedRowIndex, 17).setValues(allRows.slice(0, lastUsedRowIndex));
+  SpreadsheetApp.flush();
 }
 
 function createOnEditTrigger() {
