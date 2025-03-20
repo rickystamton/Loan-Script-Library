@@ -512,6 +512,7 @@ class BalanceManager {
         17
     );
     let extraPaidOccurred = false;
+    let loanPaidOff = false;
     let allRows = range.getValues();
     // 2) Determine how many rows are “in use”
     let lastUsedRowIndex = 0;
@@ -830,7 +831,7 @@ class BalanceManager {
           lastEndDate = periodEnd;   // move to next period
           hasReAmortized[rowIndex] = false;  // (flag remains false for this period itself)
         }
-        
+
         if (loanPaidOff) {
           for (let j = i; j < scheduledRows.length; j++) {
               let futureRow = scheduledRows[j].rowData;
