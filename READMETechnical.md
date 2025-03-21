@@ -251,7 +251,7 @@ The function also handles adding special notes and fees: if an origination fee o
 
 ### BalanceManager
 
-**Description:** This class handles recalculation of the schedule, particularly allocating payments to interest and principal, updating balances, and handling unscheduled payments or prepayments. After a schedule is generated (or when payments are recorded/edited), BalanceManager.recalcAll() will update each period’s due, paid, and balance fields according to the payments made.
+Description: This class handles recalculation of the schedule, particularly allocating payments to interest and principal, updating balances, and handling unscheduled payments or prepayments. After a schedule is generated (or when payments are recorded/edited), **BalanceManager.recalcAll()** will update each period’s due, paid, and balance fields according to the payments made.
 
 **Constructor**
 
@@ -259,48 +259,57 @@ The function also handles adding special notes and fees: if an origination fee o
 new BalanceManager(sheet)
 ```
 
-**Parameters:**
-- sheet (Sheet): The Google Sheets sheet object for the loan schedule to recalc.  
-**Description:** Creates a BalanceManager tied to a specific sheet. Internally it also references SHEET_CONFIG for column indices and boundaries.
+Parameters:
 
-**recalcAll()**  
-**Description:** Recalculates the entire loan schedule on the sheet. This is typically called after the schedule is generated, or whenever a payment entry is modified (via the onEdit trigger or manually via a menu command). Major steps performed:
-- **Read Schedule Data:** It reads all rows of the schedule output range (B through R, from START_ROW down to END_ROW).
-- **Find Last Row of Data:** Determines how many of those rows are actually in use (continuous from the start) by finding the first blank period cell.
-- **Separate Scheduled vs Unscheduled Rows:** Iterates through each used row: if the row has a valid period number and period end date, it's a scheduled row; if it has no period number but does have a payment date, it's treated as an unscheduled payment row (likely inserted by user). Two lists are built: one for scheduledRows and one for unscheduledRows.
-- **Sort Rows (for calculation order):** Scheduled rows are sorted by due date, unscheduled (extra payment) rows are sorted by actual payment date. This ensures payments are applied in chronological order when updating balances.
-- **Calculate Amortization (if needed):** If the loan is amortizing (not interest-only), it uses spreadsheet formulas to calculate the scheduled interest (IPMT) and principal (PPMT) portions for each period. This is done by writing IPMT and PPMT formulas to hidden columns (Z and AA) for each period with the loan parameters (principal, rate, etc.), retrieving their results, and then clearing those helper cells. The results are stored in memory for use in the next steps. (If the loan is interest-only, these values are not needed since scheduled principal due will be 0 until final period).
-- **Prepare Re-amortization Tracking:** It creates an array hasReAmortized to mark if a period’s remaining balance was re-amortized due to an unscheduled payment (used in complex scenarios of multiple prepayments). Initially all false.
-- **Initialize Running Balances:** Sets up running totals for principal and interest. Starting principal is the loan principal (including financed fees) from inputs; starting interest accrued is 0.
-- **Iterate Through Periods:** For each period in chronological order (including interwoven unscheduled payments):
-  - For scheduled periods: calculate interest due for the period = running principal * (appropriate periodic rate). For interest-only loans, principal due is 0 (except possibly last period). For amortizing loans, use the precomputed scheduledPr and scheduledInt (from PPMT/IPMT) for that period if no prior prepayment affected it; if a prior unscheduled payment occurred, re-amortize the remaining balance for the rest of the term (adjust the scheduled payment amounts going forward).
-  - Apply any payments: If an unscheduled payment row is encountered, or if the user entered an actual payment (Total Paid) on a scheduled row, allocate that payment to fees, interest, then principal. Underpayments/overpayments: The code will handle if Total Paid is less than Total Due (leaving some interest unpaid accumulating) or if greater (reducing principal ahead of schedule).
-  - Update balances: interest balance carries over unpaid interest (if any), principal balance is reduced by any principal paid. Ensure principal balance never goes below 0 (floor at 0).
-  - If an unscheduled payment pays off remaining principal early, mark subsequent scheduled periods as re-amortized (their scheduled interest/principal will be recalculated with new term or possibly skipped if fully paid).
-- **Write back calculated values:** Update columns for Total Due (interest due + principal due + fees due), allocate Principal Paid, Interest Paid from Total Paid, etc., and update the Interest Balance, Principal Balance, Total Balance for each row.
-- **Write Updated Values:** Finally, it writes the updated allRows data back to the sheet, replacing old values with the newly calculated amounts and balances.
+  * **sheet** (Sheet): The Google Sheets sheet object for the loan schedule to recalc.  
 
-**Parameters:** None (uses the sheet provided in constructor and reads inputs via getAllInputs internally).  
-**Returns:** None. The sheet’s schedule is updated in place.  
-**Usage:** This is called internally by triggers or menu actions. If needed, one could manually call new BalanceManager(sheet).recalcAll() to recalc a sheet’s loan balances after editing payments.
+Description: Creates a BalanceManager tied to a specific sheet. Internally it also references `SHEET_CONFIG` for column indices and boundaries.
 
-**buildIpmtPpmtResults(schedule, lastUsedCount, params)**  
-**Description:** (Internal helper method) Uses Google Sheets financial formulas to calculate the scheduled interest (IPMT) and principal (PPMT) portions for each period of a fully amortizing loan. It dynamically writes formulas into hidden columns to leverage the spreadsheet’s IPMT/PPMT and then retrieves the results. Specifically:
-- Constructs IPMT formulas of the form =-IPMT(rate, periodNum, totalPeriods, principal) for each period, and PPMT formulas =-PPMT(rate, periodNum, totalPeriods, principal). (The negative is to get positive payment amounts since IPMT/PPMT normally return negative for outflows.)
-- Writes these formulas to the sheet (e.g., column Z and AA) for all periods, then immediately reads the calculated values with getValues().
-- Clears the formulas from those cells (to not clutter the sheet or leave artifacts).
-- Returns two 2D arrays: one for interest portions and one for principal portions, aligned by row index.
+#### recalcAll()
 
-**Parameters:**
-- schedule (Array of Arrays): The raw schedule data (not heavily used except for counting periods).
-- lastUsedCount (Number): How many rows of the schedule are active (period count).
-- params (Object): Loan parameters, from which it uses params.monthlyRate (monthly interest rate) and number of periods, etc.  
-**Returns:** [ipmtVals, ppmtVals] — two arrays of size [lastUsedCount x 1] each, containing the interest and principal portions for each period (or empty strings for interest-only periods where amortization doesn’t apply). These results are then mapped to their corresponding period indices.  
-**Note:** This method is called inside recalcAll() for amortizing loans. It is not typically called on its own.
+Description: Recalculates the entire loan schedule on the sheet. This is typically called after the schedule is generated, or whenever a payment entry is modified (via the onEdit trigger or manually via a menu command). **Major steps performed:**
+
+  * **Read Schedule Data:** Reads all rows of the schedule output range (columns B through R, from `START_ROW` down to `END_ROW`).
+  * **Find Last Row of Data:** Determines how many of those rows are actually in use (continuous from the start) by finding the first blank Period cell.
+  * **Separate Scheduled vs Unscheduled Rows:** Iterates through each used row. If the row has a valid period number and period end date, it's a *scheduled* row; if it has no period number but does have a payment date, it's treated as an *unscheduled payment* row (likely inserted by the user for an extra payment). Two lists are built: one for `scheduledRows` and one for `unscheduledRows`.
+  * **Sort Rows (for calculation order):** Scheduled rows are sorted by due date, and unscheduled (extra payment) rows are sorted by actual payment date. This ensures payments are applied in chronological order when updating balances.
+  * **Calculate Amortization (if needed):** If the loan is amortizing (not interest-only), the script uses spreadsheet formulas to calculate the scheduled interest (IPMT) and principal (PPMT) portions for each period. This is done by writing IPMT and PPMT formulas to hidden columns (e.g. Z and AA) for each period with the loan parameters (principal, rate, etc.), retrieving their results, then clearing those helper cells. The results are stored in memory for use in the next steps. (If the loan is interest-only, these values are not needed since scheduled principal due will be 0 until the final period.)
+  * **Prepare Re-amortization Tracking:** Creates an array `hasReAmortized` to mark if a period’s schedule was re-amortized due to an unscheduled payment (used in complex scenarios of multiple prepayments). Initially all values are **false**.
+  * **Initialize Running Balances:** Sets up running totals for principal and interest. The starting principal is the loan principal (including any financed fees) from inputs; starting accrued interest is 0.
+  * **Iterate Through Periods:** For each period in chronological order (processing unscheduled payments in between as they occur):
+    * **Scheduled periods:** Calculate interest accrued for the period = `runningPrincipal * periodicRate` (depending on day-count method). For interest-only loans, principal due is 0 (except possibly in the final period). For amortizing loans, use the precomputed `scheduledPr` and `scheduledInt` from PPMT/IPMT for that period if no prior prepayment affected the schedule. If a prior unscheduled payment (prepayment) occurred, the remaining balance is lower; the algorithm reduces the interest due for this period accordingly and increases the principal due by the difference (the total payment due remains equal to the originally scheduled amount). By default, future scheduled payment amounts remain as initially calculated (resulting in the loan being paid off early if extra payments were made).
+    * **Apply any payments:** If an unscheduled payment row is encountered (or if the user entered an actual payment on a scheduled row), allocate that payment to fees, then interest, then principal. Underpayments/overpayments are handled: if Total Paid is less than Total Due, the shortfall remains as unpaid interest (accruing to next period); if Total Paid is greater, the extra amount reduces principal ahead of schedule.
+    * **Update balances:** The interest balance (`runningInterest`) carries over any unpaid interest. The principal balance (`runningPrincipal`) is reduced by any principal paid. The code ensures principal never goes below 0 (floors at 0).
+    * **If loan pays off early:** If a prepayment (or combination of payments) fully pays off the remaining principal **before** the end of the term, the script will zero out any subsequent scheduled periods (setting their Principal Due, Interest Due, and Total Due to 0) since the loan is now fully repaid, and it breaks out of the loop.
+  * **Write back calculated values:** Updates the schedule’s cells with the newly calculated amounts and balances for each period. This includes Total Due (col G = interest due + principal due + fees due), Principal Paid/Interest Paid (if an actual payment was entered), and the Interest Balance (col O), Principal Balance (col P), and Total Balance (col Q) for each period after applying payments.
+
+**Note:** By default, extra payments on amortizing loans will shorten the loan (you’ll pay off earlier), while the scheduled payment amounts remain unchanged. If you want to re-amortize the remaining loan after a prepayment (i.e. adjust future payment amounts to the new balance), you can use the `recastLoan()` function (described below) to recalculate the schedule for all future periods.
+
+Parameters: None (uses the sheet provided in the constructor and reads inputs via `getAllInputs` internally).  
+Returns: None. The sheet’s schedule is updated in place.  
+Usage: This method is called internally by triggers or menu actions. For example, if a user records a payment or inserts an unscheduled payment row, the script will invoke `BalanceManager.recalcAll()` to update the schedule. If needed, one could manually call `new BalanceManager(sheet).recalcAll()` to recalc a sheet’s loan balances after editing payments.
+
+#### buildIpmtPpmtResults(schedule, lastUsedCount, params)
+
+Description: *(Internal helper method)* Uses Google Sheets financial formulas to calculate the scheduled interest and principal portions for each period of a fully amortizing loan. It dynamically writes formulas into hidden cells to leverage the spreadsheet’s **IPMT**/**PPMT** functions, then retrieves the results. Specifically:
+
+  * Constructs IPMT formulas of the form `=-IPMT(rate, periodNum, totalPeriods, principal)` for each period, and PPMT formulas of the form `=-PPMT(rate, periodNum, totalPeriods, principal)`. (The negative sign is used to get positive values, since IPMT/PPMT normally return negatives for outgoing payments.)
+  * Writes these formulas to the sheet (in hidden helper columns, e.g. Z and AA) for all periods, then immediately reads the calculated values with `getValues()`.
+  * Clears the helper formulas from those cells (to avoid leaving any artifacts on the sheet).
+  * Returns two arrays: one for interest portions and one for principal portions, each of size `[lastUsedCount x 1]`. These arrays contain the scheduled interest and principal for each period (or empty strings for periods where amortization doesn’t apply, such as interest-only periods). These results are then mapped to their corresponding period indices in memory for use during recalculation.
+
+Parameters:
+
+  * **schedule** (Array of Arrays): The raw schedule data (not heavily used except for counting periods).
+  * **lastUsedCount** (Number): How many rows of the schedule are active (number of periods).
+  * **params** (Object): Loan parameters (uses `params.monthlyRate` for the interest rate per period, `params.termMonths` for total periods, etc.).  
+
+Returns: `[ipmtVals, ppmtVals]` — two 2D arrays (each of dimensions lastUsedCount × 1), containing the interest and principal portions for each period. (For periods where no amortization applies, these may be empty strings.)  
+**Note:** This method is called inside **recalcAll()** for amortizing loans to get the payment breakdown. It is not typically called on its own.
 
 ### RowManager
 
-**Description:** This class helps manage manual modifications to the schedule, specifically when the user inserts a new row in the schedule to record an unscheduled payment. The handleInsertedRow method will initialize the new row with appropriate values and adjust the period numbering.
+Description: This class helps manage manual modifications to the schedule, specifically when the user inserts a new row in the schedule to record an unscheduled payment. The **RowManager.handleInsertedRow()** method will initialize the new row with appropriate values and adjust the period numbering as needed.
 
 **Constructor**
 
@@ -308,20 +317,26 @@ new BalanceManager(sheet)
 new RowManager(sheet)
 ```
 
-**Parameters:**
-- sheet (Sheet): The Google Sheets sheet object for the loan schedule.  
-**Description:** Creates a RowManager instance for a given sheet.
+Parameters:
 
-**handleInsertedRow(insertedRow)**  
-**Description:** Prepares a newly inserted row (at position insertedRow) in the schedule to represent an unscheduled payment. When the user inserts a blank row in the schedule area, this function should be called to set it up. It performs the following:
-- **Assign Period Number:** Determines a new period identifier for the inserted row that lies between the previous and next period. If the adjacent rows have period numbers, it averages them (e.g., if inserted between period 1 and 2, new period becomes 1.5). If inserted at the very top or bottom of schedule, it uses 0.5 or lastPeriod+0.5 accordingly. The period number is placed in column B of the new row.
-- **Copy Balances:** Copies the ending Interest Balance (col O) and Principal Balance (col P) from the row above (previous row) into this new row as the starting balances for the unscheduled payment. It also sets Total Balance (col Q) as the sum of those, ensuring the new row starts with the correct carryover balances.
-- **Initialize Other Fields:** Sets the new row’s Period End, Due Date, Days to blank (because this row isn’t a scheduled period with its own due date), and Paid On to blank (user will fill in actual payment date). It sets Total Due (col G) to 0 (since this row itself doesn’t have a pre-computed due, it will be filled after entering payment), Total Paid to 0, Principal Due and Interest Due to blank (since it’s not a scheduled payment, those aren’t predetermined), and Fees Due to blank. Principal Paid, Interest Paid, Fees Paid are set to 0 as starting values (no payment recorded yet). Notes is left empty.
+  * **sheet** (Sheet): The Google Sheets sheet object for the loan schedule.  
 
-**Parameters:**
-- insertedRow (Number): The sheet row number where a new row has been inserted (1-indexed, e.g., 9 if inserted after row 8). This should be within the schedule area (START_ROW to END_ROW).  
-**Returns:** None. It directly populates the cells in the inserted row on the sheet.  
-**Usage:** Typically triggered by a custom menu item (or via the onEdit trigger if detecting a specific user action). After inserting a row in the sheet, call RowManager.handleInsertedRow(newRowNumber) to configure it. For example, if a user wants to record an extra payment between period 1 and 2, they would insert a row in the sheet (which becomes new row 9 if 8 was period 1, 10 was period 2), then the script should run this function to label it as period 1.5 and carry balances down.
+Description: Creates a RowManager instance for a given sheet.
+
+#### handleInsertedRow(insertedRow)
+
+Description: Prepares a newly inserted row (at position `insertedRow`) in the schedule to represent an unscheduled payment. When the user inserts a blank row in the schedule area, this function should be called to set it up. It performs the following:
+
+  * **Assign Period Number:** Determines an appropriate period identifier for the inserted row that lies between the previous and next period. If the adjacent rows have period numbers, it averages them (e.g. if inserted between period 1 and 2, the new period becomes 1.5). If inserted at the very top or bottom of the schedule, it uses 0.5 or lastPeriod+0.5 accordingly. The period number is placed in column B of the new row.
+  * **Copy Balances:** Copies the ending Interest Balance (col O) and Principal Balance (col P) from the row above (the previous row) into the new row as the starting balances for the unscheduled payment period. It also sets Total Balance (col Q) as the sum of those, ensuring the new row starts with the correct carry-over balances.
+  * **Initialize Other Fields:** Sets the new row’s Period End, Due Date, and Days in Period to blank (because this row isn’t a scheduled period with its own due date). Sets Paid On to blank (the user will fill in the actual payment date). It sets Total Due (col G) to 0 (since this unscheduled row doesn’t have a pre-computed payment due; it will be filled after the payment is entered), Total Paid to 0, and Principal Due and Interest Due to blank (not applicable for an unscheduled row). Fees Due is set to blank as well. Principal Paid, Interest Paid, and Fees Paid are initialized to 0. The Notes column is left empty.
+
+Parameters:
+
+  * **insertedRow** (Number): The sheet row number where a new row has been inserted (1-indexed, e.g., 9 if inserted after sheet row 8). This should be within the schedule area (`START_ROW` to `END_ROW`).  
+
+Returns: None. This function directly populates the cells in the newly inserted row on the sheet.  
+Usage: Typically triggered by a custom menu item or via an onEdit trigger when detecting a specific user action. For example, if a user wants to record an extra payment between period 1 and 2, they would insert a blank row in the sheet (say, new sheet row 9 if row 8 was period 1 and row 10 was period 2). After insertion, the script should run `RowManager.handleInsertedRow(9)` to label it as period 1.5 and carry over the balances from the previous period.
 
 ## Global Functions (Library Interface)
 
@@ -373,10 +388,12 @@ Typically, this is invoked via a menu item (e.g., "Generate Schedule") or can be
 **Usage:** This can be executed manually (or via a one-time menu action) to set up the onEdit trigger. For example, the wrapper script provides a setupTriggers() function that calls this. When run, Google will ask for authorization to set up triggers if not already granted. After running, any edit on the sheet will fire the library’s onEdit as described above. Normally, you would call createOnEditTrigger() once after setting up the sheet for the first time.
 
 ### createLoanScheduleMenu()
-**Description:** Adds a custom menu to the Google Sheets UI for loan schedule actions. The menu is typically called "Loan Tools" (or similar) and contains items to generate the schedule, insert an unscheduled payment row, and recalculate balances. This function uses the SpreadsheetApp UI service to create the menu and link each item to the corresponding function. For example, menu items like "Generate Schedule" → generateLoanSchedule, "Add Unscheduled Payment" → insertUnscheduledPaymentRow, and "Recalculate Balances" → recalcAll().  
-**Parameters:** None.  
-**Returns:** None. The menu is added to the spreadsheet’s interface.  
-**Usage:** This function should be called on spreadsheet open. In practice, the wrapper’s onOpen trigger calls LoanScriptLibrary.createLoanScheduleMenu() to build the menu for the user. If implementing without the wrapper, one could use a bound script’s onOpen to call this library function.
+
+Description: Adds a custom menu to the Google Sheets UI for loan schedule actions. The menu is typically labeled "Loan Tools" (or similar) and contains items to generate the schedule, insert an unscheduled payment row, recalculate balances, and recast the remaining schedule. This function uses the SpreadsheetApp UI service to create the menu and link each item to the corresponding function. For example, menu items like **"Generate Schedule" → generateLoanSchedule**, **"Add Unscheduled Payment" → insertUnscheduledPaymentRow**, **"Recalculate Balances" → recalcAll()**, and **"Recast Loan" → recastLoan** are added under the "Loan Tools" menu.
+
+Parameters: None.  
+Returns: None. The menu is added to the spreadsheet’s interface.  
+Usage: This function should be called when the spreadsheet is opened. In practice, the wrapper’s **onOpen** trigger calls `LoanScriptLibrary.createLoanScheduleMenu()` to build the menu for the user. (If implementing without the provided wrapper, a bound script’s onOpen could call this library function to achieve the same result.)
 
 # SummaryPage.js – Loan Summary Sheet Script
 
@@ -421,53 +438,82 @@ LoanScriptWrapper.js is a thin wrapper script intended to be placed in the Googl
 ## Functions
 
 ### onOpen(e)
-**Description:** A simple trigger that runs when the spreadsheet is opened. It adds custom menus for both Loan schedule actions and Summary actions by calling the library’s menu creation functions. Specifically, it calls LoanScriptLibrary.createLoanSummaryMenu() and LoanScriptLibrary.createLoanScheduleMenu() to add the "Summary Tools" and "Loan Tools" menus to the Google Sheets UI.  
-**Parameters:**
-- e (Event): The onOpen event object (not used in this implementation, but included for completeness).  
-**Returns:** None.  
-**Usage:** This function is automatically invoked when the spreadsheet is opened (if added as a trigger or if present as a bound script function named onOpen). Through it, the user will see custom menu items like "Generate Schedule", "Add Unscheduled Payment Row", "Recalculate Balances", "Populate Sheet Names", "Update Summary". No manual call is needed by the user.
+
+Description: A simple trigger that runs when the spreadsheet is opened. It adds custom menus for both loan schedule actions and summary actions by calling the library’s menu creation functions. Specifically, it calls `LoanScriptLibrary.createLoanSummaryMenu()` and `LoanScriptLibrary.createLoanScheduleMenu()` to add the **"Summary Tools"** and **"Loan Tools"** menus to the Google Sheets UI.  
+
+Parameters:
+
+  * **e** (Event): The onOpen event object (not used in this implementation, included only for completeness).  
+
+Returns: None.  
+Usage: This function is automatically invoked when the spreadsheet is opened (as long as it is set up as an onOpen trigger or the function exists in a bound script with this name). Through it, the user will see custom menu items like "Generate Schedule", "Add Unscheduled Payment Row", "Recalculate Balances", **"Recast Loan"**, "Populate Sheet Names", "Update Summary". No manual call by the user is needed; it runs on every open to ensure menus are present.
 
 ### generateLoanSchedule()
-**Description:** Menu/utility function that calls the library’s generateLoanSchedule() to create or refresh the loan schedule on the active sheet. This wrapper is what the menu item "Generate Schedule" triggers.  
-**Parameters:** None.  
-**Returns:** None.  
-**Usage:** The user clicks "Loan Tools -> Generate Schedule" in the spreadsheet, which triggers this function. Alternatively, it can be run directly from the script editor for testing. It requires that the Loan Script Library is added and accessible as LoanScriptLibrary. When invoked, it simply executes LoanScriptLibrary.generateLoanSchedule().
+
+Description: Menu/utility function that calls the library’s `generateLoanSchedule()` to create or refresh the loan schedule on the active sheet. This is the function triggered by the "Generate Schedule" menu item.  
+
+Parameters: None.  
+Returns: None.  
+Usage: The user clicks **Loan Tools → Generate Schedule** in the spreadsheet, which triggers this function. (It can also be run directly from the script editor for testing.) It requires that the Loan Script Library is added and accessible as `LoanScriptLibrary`. When invoked, it simply executes `LoanScriptLibrary.generateLoanSchedule()`, which generates a new schedule on the active sheet based on the input parameters.
 
 ### insertUnscheduledPaymentRow()
-**Description:** Calls the library’s insertUnscheduledPaymentRow() function to add a new unscheduled payment row to the active sheet’s schedule. This is connected to the "Add Unscheduled Payment" menu option.  
-**Parameters:** None.  
-**Returns:** None.  
-**Usage:** Triggered via menu by the user when they want to insert an extra payment. It internally runs LoanScriptLibrary.insertUnscheduledPaymentRow(), which will handle the row insertion and recalculation as documented above.
+
+Description: Calls the library’s `insertUnscheduledPaymentRow()` function to add a new unscheduled payment row to the active sheet’s schedule. This is tied to the "Add Unscheduled Payment" menu option.  
+
+Parameters: None.  
+Returns: None.  
+Usage: Triggered via the menu when the user wants to insert an extra payment row. It internally runs `LoanScriptLibrary.insertUnscheduledPaymentRow()`, which will handle inserting the row and initializing it as described above. After this function executes, a new row will appear in the schedule (with a period number like 1.5, etc.) ready for the user to enter the payment details. Balances from the prior period are carried into the new row.
 
 ### recalcAll()
-**Description:** Calls the library’s recalcAll() function to recalculate the loan schedule on the active sheet. This corresponds to the "Recalculate Balances" menu item.  
-**Parameters:** None.  
-**Returns:** None.  
-**Usage:** Invoked by the user through the menu or can be manually run. It will execute LoanScriptLibrary.recalcAll(), causing the active loan sheet’s balances and payments to be refreshed.
+
+Description: Calls the library’s `recalcAll()` function to recalculate the loan schedule on the active sheet. This corresponds to the "Recalculate Balances" menu item.  
+
+Parameters: None.  
+Returns: None.  
+Usage: Invoked by the user through the menu or via an onEdit trigger. It will execute `LoanScriptLibrary.recalcAll()`, causing the active loan sheet’s balances and payment allocations to be refreshed. For example, if the user updates a payment amount or date in the schedule, this function (via the menu or trigger) will recompute all affected interest, principal, and balance fields.
+
+### recastLoan()
+
+Description: Calls the library’s `recastLoan()` function to re-amortize the remaining loan schedule on the active sheet. This corresponds to the "Recast Loan" menu command under "Loan Tools".  
+
+Parameters: None.  
+Returns: None.  
+Usage: Typically invoked by the user via the menu after making a lump-sum prepayment on an amortizing loan. When the user selects **Loan Tools → Recast Loan**, this function runs and calls `LoanScriptLibrary.recastLoan()`. The library will determine the current outstanding principal and number of periods remaining, then recalculate the payment schedule for all future periods so that the loan is fully paid off by the original end date. After this function executes, each remaining scheduled period’s **Principal Due**, **Interest Due**, and **Total Due** are updated on the sheet to reflect the new amortized payment plan (usually resulting in lower periodic payments going forward, since the principal was reduced by the prepayment).
 
 ### onEdit(e)
-**Description:** A simple trigger that runs when the user edits the spreadsheet. This wrapper function passes the event to the library’s onEdit(e) handler. Essentially, it ensures that any edit events in the spreadsheet call the library logic (which will handle locked inputs, auto-regeneration, auto-recalc as needed).  
-**Parameters:**
-- e (Event): The edit event object.  
-**Returns:** None.  
-**Usage:** This is automatically invoked on every edit (when installed as a trigger). In this wrapper, it simply does LoanScriptLibrary.onEdit(e). By forwarding the event, it allows the centralized logic in the library to respond to user edits. The user does not call this manually.
+
+Description: A simple trigger that runs when the user edits the spreadsheet. This wrapper function passes the event to the library’s onEdit handler. Essentially, it ensures that any edit events in the spreadsheet invoke the central library logic (which handles locking inputs, auto-regeneration, and auto-recalc as needed).  
+
+Parameters:
+
+  * **e** (Event): The edit event object.  
+
+Returns: None.  
+Usage: This is automatically invoked on every edit (when installed as an onEdit trigger). In this wrapper, it simply calls `LoanScriptLibrary.onEdit(e)`. By forwarding the event, it allows the library’s centralized logic to respond to user edits. The user should not need to call this manually.
 
 ### populateSheetNames()
-**Description:** Calls the library’s populateSheetNames() function to list all loan sheets on the Summary sheet. This is connected to the "Populate Sheet Names" menu item under "Summary Tools".  
-**Parameters:** None.  
-**Returns:** None.  
-**Usage:** Invoked via menu by the user (or could be run manually). It executes LoanScriptLibrary.populateSheetNames(), so the Summary sheet gets updated with the current sheet names.
+
+Description: Calls the library’s `populateSheetNames()` function to list all loan sheet names on the Summary sheet. This is connected to the "Populate Sheet Names" menu item under "Summary Tools".  
+
+Parameters: None.  
+Returns: None.  
+Usage: Invoked via the menu by the user (or can be run manually). It executes `LoanScriptLibrary.populateSheetNames()`, causing the Summary sheet to be updated with the current loan sheet names. Typically used after adding or renaming loan sheets, so the summary list stays up-to-date.
 
 ### updateSummary()
-**Description:** Calls the library’s updateSummary() function to refresh the summary data for all loans. This is tied to the "Update Summary" menu item.  
-**Parameters:** None.  
-**Returns:** None.  
-**Usage:** When the user selects "Update Summary" from the menu, this function runs and simply calls LoanScriptLibrary.updateSummary(). The result is that the Summary sheet’s Columns C–I are recalculated for each listed loan.
+
+Description: Calls the library’s `updateSummary()` function to refresh the summary data for all loans. This is tied to the "Update Summary" menu item under "Summary Tools".  
+
+Parameters: None.  
+Returns: None.  
+Usage: When the user selects **Summary Tools → Update Summary** from the menu, this function runs and simply calls `LoanScriptLibrary.updateSummary()`. The result is that the Summary sheet’s metrics (columns C–I listing balances, payments, etc. for each loan) are recalculated for each listed loan.
 
 ### setupTriggers()
-**Description:** Installs the necessary triggers by calling the library’s createOnEditTrigger() function. Running this will create an installable onEdit trigger for the spreadsheet if one doesn’t exist, ensuring that the library’s onEdit function is called properly on user edits.  
-**Parameters:** None.  
-**Returns:** None.  
-**Usage:** This function can be run once (for example, via the script editor or a special menu command if added) to set up the trigger after the library is installed. In the wrapper code, this isn’t automatically called on open; it’s provided as a utility. The user may need to run setupTriggers() manually (or the developer can set up the trigger through the Apps Script interface). Once executed, the onEdit trigger will persist and call the library’s handler for each edit.  
-**Note:** Ensure that the identifier LoanScriptLibrary in all the above calls matches the name of the library as added to your project. If you import the library under a different identifier, you need to replace LoanScriptLibrary in this wrapper with that identifier. The wrapper functions themselves have no logic besides forwarding to the library, so they rely on the library being correctly added to function.
+
+Description: Installs the necessary triggers by calling the library’s `createOnEditTrigger()` function. Running this will create an *installable* onEdit trigger for the spreadsheet if one doesn’t exist, ensuring that the library’s onEdit function is properly called on user edits.  
+
+Parameters: None.  
+Returns: None.  
+Usage: This function can be run once (for example, via the script editor or a one-time menu action) to set up the trigger after the library is installed. In the provided wrapper code, this isn’t automatically called on open; it’s provided as a utility. The user or developer may need to run `setupTriggers()` manually (or set up the trigger via the Apps Script interface). Once executed, the installable onEdit trigger will persist and call the library’s onEdit handler for each edit on any loan sheet.
+
+**Note:** Ensure that the identifier `LoanScriptLibrary` in all the above calls matches the name of the library as added to your project. If you import the library under a different identifier, you will need to update the function calls in this wrapper (e.g., use your chosen name instead of `LoanScriptLibrary`). The wrapper functions themselves contain no logic besides forwarding to the library, so they rely on the library being added with the correct identifier.
 ```
