@@ -9,6 +9,8 @@ if (typeof SpreadsheetApp.flush !== 'function') {
   SpreadsheetApp.flush = jest.fn();
 }
 
+process.env.TZ = 'America/Denver';  // Set timezone for consistent date handling
+
 // Simple mock for Google Sheets Sheet and Range
 class MockRange {
   constructor(sheet, startRow, startCol, numRows = 1, numCols = 1) {
@@ -140,7 +142,7 @@ describe('Loan schedule generation', () => {
     const params1 = {
       termMonths: 3,
       prorateFirst: "No",
-      closingDate: new Date('2023-01-15'),  // mid-month start
+      closingDate: new Date(2023, 0, 15),  // mid-month start
       dayCountMethod: "Actual"
     };
     const gen1 = new LoanScheduleGenerator(sheet);
@@ -159,7 +161,7 @@ describe('Loan schedule generation', () => {
     const params2 = {
       termMonths: 3,
       prorateFirst: "Yes",
-      closingDate: new Date('2023-01-15'),
+      closingDate: new Date(2023, 0, 15),
       dayCountMethod: "Actual"
     };
     const gen2 = new LoanScheduleGenerator(sheet);
@@ -182,7 +184,7 @@ describe('Loan schedule generation', () => {
     const origFeePct = 0.05;   // 5% origination
     const exitFeePct = 0.02;   // 2% exit
     const annualRate = 0.1;    // 10% interest (for day count calculation, not critical here)
-    const closingDate = new Date('2023-01-01');
+    const closingDate = new Date(2023, 0, 1);
     // Set inputs in the sheet (getAllInputs will read these)
     setLoanInputs(sheet, {
       loanName: "Fee Test Loan",
@@ -194,7 +196,7 @@ describe('Loan schedule generation', () => {
       paymentFreq: "Monthly",
       dayCountMethod: "Actual",
       daysPerYear: 365,
-      prepaidIntDate: new Date('2023-01-15'),  // prepaid interest up to Jan 15, 2023
+      prepaidIntDate: new Date(2023, 0, 15),  // prepaid interest up to Jan 15, 2023
       amortizeYN: "Yes",  // (amortize doesn't matter for fee placement)
       origFeePct: origFeePct,
       exitFeePct: exitFeePct
@@ -221,7 +223,7 @@ describe('Loan schedule generation', () => {
     expect(firstNotes).toMatch(/Origination Fee added to Principal/);
     expect(firstNotes).toMatch(/Prepaid Interest/);
     // It should include the percentage string "5%" and a currency amount for prepaid interest
-    expect(firstNotes).toMatch(/5% Origination Fee/);
+    expect(firstNotes).toMatch(/5.00% Origination Fee/);
     expect(firstNotes).toMatch(/\$[0-9,.]+ of Prepaid Interest/);
     // Last row (period 2) should have an exit fee due and a note
     const lastRow = schedule[schedule.length - 1];
