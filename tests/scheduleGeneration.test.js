@@ -1,9 +1,9 @@
-// jest setup file or top of test file:
-require('gas-mock-globals');  // This will automatically define SpreadsheetApp, etc.
-
 // tests/scheduleGeneration.test.js
 
 const { LoanScheduleGenerator, getTotalPeriods } = require('../LoanScript.js');
+
+// jest setup file or top of test file:
+require('gas-mock-globals');  // This will automatically define SpreadsheetApp, etc.
 
 // Simple mock for Google Sheets Sheet and Range
 class MockRange {
