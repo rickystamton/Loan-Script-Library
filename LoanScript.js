@@ -1241,3 +1241,13 @@ function onEdit(e) {
     SpreadsheetApp.getUi().alert("onEdit error: " + err.message);
   }
 }
+// Export internal functions and classes for Node.js testing
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    LoanScheduleGenerator,
+    BalanceManager,
+    RowManager,
+    getTotalPeriods,
+    // You can include other helper functions here if needed, e.g. daysBetween, etc.
+  };
+}
