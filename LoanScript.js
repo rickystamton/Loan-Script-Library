@@ -1248,7 +1248,6 @@ if (typeof module !== 'undefined' && module.exports) {
     BalanceManager,
     RowManager,
     getTotalPeriods,
-    SpreadsheetApp,
     // You can include other helper functions here if needed, e.g. daysBetween, etc.
   };
 }
