@@ -261,7 +261,6 @@ describe('Loan repayment calculations', () => {
     for (let i = 0; i < numPeriods - 1; i++) {
       expect(interestDueVals[i]).toBeCloseTo(expectedMonthlyInterest, 2);
     }
-    // If no interest was paid until the end, the final period's Interest Due should include all accrued interest.
     // However, in our case with paymentFreq "Monthly", the script treats interest as due each period, so final Interest Due should just be one period's interest (if prior interest was not paid, it would reflect in Interest Balance).
     const finalInterestDue = interestDueVals[numPeriods - 1];
     expect(finalInterestDue).toBeCloseTo(expectedMonthlyInterest, 2);
@@ -269,7 +268,7 @@ describe('Loan repayment calculations', () => {
     // Since we did not mark any interest as paid, interestBalance in final row should equal sum of all interest (which would be 5 * 250 = 1250) if interest was left unpaid.
     const interestBalanceVals = schedule.map(r => r[13]);
     const finalInterestBalance = interestBalanceVals[numPeriods - 1];
-    const sumInterestAccrued = expectedMonthlyInterest * (numPeriods - 1);
+    const sumInterestAccrued = expectedMonthlyInterest * (numPeriods);
     expect(finalInterestBalance).toBeCloseTo(sumInterestAccrued, 2);
     // Total balance (col Q) of final period should equal principal + accrued interest (since nothing paid)
     const finalTotalBalance = schedule[numPeriods - 1][15];

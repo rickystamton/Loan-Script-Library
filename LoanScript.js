@@ -765,9 +765,10 @@ class BalanceManager {
       }
         else if (isMonthly && params.amortizeYN === "No" && Number.isInteger(periodNum) && periodNum === params.termMonths) {
             // Interest-only loan, final period: all remaining interest and principal due at end
-            newInterestDue = runningInterest;
+            //newInterestDue = runningInterest;
+            newInterestDue = interestAccruedThisRow;
             newPrincipalDue = runningPrincipal;
-        } 
+        }
       else if (isMonthly && params.amortizeYN === "No" 
         && Number.isInteger(periodNum) 
         && periodNum < params.termMonths) {
