@@ -1,6 +1,15 @@
 /*********************************************************************************
- * FAST LOAN SCHEDULE SCRIPT
+ LoanScript.js
  *********************************************************************************/
+
+// Import LoanHelpers module (for Node.js/testing environment). In Apps Script, LoanHelpers functions are loaded globally via separate file include.
+var LoanHelpers;
+if (typeof require !== 'undefined' && typeof module !== 'undefined' && module.exports) {
+    LoanHelpers = require('./LoanHelpers.js');
+} else if (typeof LoanHelpers !== 'undefined') {
+    // In Google Apps Script, the LoanHelpers object is already defined
+    // (from the included LoanHelpers.js file in the project)
+}
 
 // ---------------------
 // 1) SHEET CONFIG
@@ -528,33 +537,8 @@ class BalanceManager {
         lastUsedRowIndex++;
     }
     if (lastUsedRowIndex === 0) return;
-    // 3) Separate “scheduled” rows vs. “unscheduled”
-    const scheduledRows = [];
-    const unscheduledRows = [];
-    for (let i = 0; i < lastUsedRowIndex; i++) {
-        const rowArr = allRows[i];
-        const periodVal = rowArr[0];    // Period (col B)
-        const periodEnd = rowArr[1];    // Period End Date (col C)
-        const paidOnVal = rowArr[4];    // Paid On Date (col F)
-        const isScheduled = (
-            Number.isInteger(periodVal) &&
-            periodEnd instanceof Date &&
-            !isNaN(periodEnd)
-        );
-        const isUnscheduled = (
-            !Number.isInteger(periodVal) &&
-            paidOnVal instanceof Date &&
-            !isNaN(paidOnVal)
-        );
-        if (isScheduled) {
-            scheduledRows.push({ rowIndex: i, rowData: rowArr });
-        } else if (isUnscheduled) {
-            unscheduledRows.push({ rowIndex: i, rowData: rowArr });
-        }
-    }
-    // 4) Sort scheduled rows by due date, and unscheduled rows by paid date
-    scheduledRows.sort((a, b) => a.rowData[1] - b.rowData[1]);
-    unscheduledRows.sort((a, b) => a.rowData[4] - b.rowData[4]);
+    // 3) Separate “scheduled” vs. “unscheduled” rows and sort them
+    const { scheduledRows, unscheduledRows } = LoanHelpers.separateRows(allRows, lastUsedRowIndex);
     // 5) Build IPMT/PPMT results for monthly amortizing loans
     const [ipmtVals, ppmtVals] = this.buildIpmtPpmtResults(allRows, lastUsedRowIndex, params);
     const ipmtMap = {}, ppmtMap = {};
@@ -588,249 +572,89 @@ class BalanceManager {
         const periodNum = rowArr[0];   // Period number (col B)
         const periodEnd = rowArr[1];   // Period end date (col C)
 
-        // *** CHANGED: Initialize tracker for unscheduled principal paid in this period**
-        let unscheduledPrincipalPaidThisPeriod = 0;
-
-        // Determine total days in this period (especially for 30/360 convention)
-        let totalActualDaysThisPeriod = 30;
-        let monthly30DaysUsedSoFar = 0;
-        if (isPeriodicMethod && isMonthly && Number.isInteger(periodNum) && periodNum >= 1) {
-            const scheduledPeriodStart = oneDayAfter(lastEndDate);
-            let rawDays = calcUnpaidDays(scheduledPeriodStart, periodEnd, params.prepaidUntil);
-            if (rawDays < 1) rawDays = 30;
-            totalActualDaysThisPeriod = rawDays;
+        // Determine the start of this period for interest calculations:
+        let periodStart;
+        if (Number.isInteger(periodNum) && periodNum === 0 && params.prorateFirst === "Yes") {
+          // For period 0 with prorated first period, interest starts on closingDate (lastEndDate is closingDate here)
+          periodStart = lastEndDate;
+        } else {
+          periodStart = oneDayAfter(lastEndDate);
         }
-
-        // Accumulate interest for sub-intervals within this period
-        let interestAccruedThisRow = 0;
-        let subStart = (Number.isInteger(periodNum) && periodNum === 0 && params.prorateFirst === "Yes")
-                        ? lastEndDate 
-                        : oneDayAfter(lastEndDate);
-        if (isPeriodicMethod && isMonthly && Number.isInteger(periodNum) && periodNum >= 1) {
-            // Ensure subStart is not before the last end date (handles back-to-back unscheduled payments)
-            if (subStart < lastEndDate) subStart = lastEndDate;
+        // Adjust periodStart if necessary (prevent going backwards in time)
+        if (params.dayCountMethod === "Periodic" && params.paymentFreq === "Monthly" 
+            && Number.isInteger(periodNum) && periodNum >= 1 && periodStart < lastEndDate) {
+          periodStart = lastEndDate;
         }
+        // 5) Apply any unscheduled payments up to this period’s end date
+        const unschedResult = LoanHelpers.applyUnscheduledPaymentsForPeriod(
+          periodNum,
+          periodStart,
+          periodEnd,
+          params,
+          unscheduledRows,
+          unschedIndex,
+          runningPrincipal,
+          runningInterest,
+          runningFees
+        );
+        // Update running balances and unscheduled index from the result
+        runningPrincipal = unschedResult.runningPrincipal;
+        runningInterest = unschedResult.runningInterest;
+        runningFees = unschedResult.runningFees;
+        unschedIndex = unschedResult.unschedIndex;
+        const interestAccruedThisPeriod = unschedResult.interestAccrued;
+        const unscheduledPrincipalPaidThisPeriod = unschedResult.unscheduledPrincipalPaid;
 
-        // Apply all unscheduled payments dated on or before this period's end date
-        while (
-            unschedIndex < unscheduledRows.length &&
-            unscheduledRows[unschedIndex].rowData[4] <= periodEnd  // unscheduled PaidOn (col F) <= current period end
-        ) {
-            const uRowArr = unscheduledRows[unschedIndex].rowData;
-            const paidOn  = uRowArr[4];  // Paid On date of unscheduled payment
-            // Accrue interest from subStart up to the unscheduled payment date (for partial period)
-            if (isPeriodicMethod && isMonthly && Number.isInteger(periodNum) && periodNum >= 1) {
-                if (paidOn >= subStart && runningPrincipal > 1e-6) {
-                    // Calculate fraction of period before this prepayment
-                    let actualSubDays = calcUnpaidDays(subStart, paidOn, params.prepaidUntil);
-                    if (actualSubDays < 0) actualSubDays = 0;
-                    const fractionOfMonth = actualSubDays / totalActualDaysThisPeriod;
-                    let scaledSubDays = 30 * fractionOfMonth;
-                    const leftover = 30 - monthly30DaysUsedSoFar;
-                    if (scaledSubDays > leftover) scaledSubDays = leftover;
-                    if (scaledSubDays < 0) scaledSubDays = 0;
-                    if (scaledSubDays > 0) {
-                        // Accrue interest for this sub-period on current principal
-                        const iNow = runningPrincipal * dailyPeriodicRate * scaledSubDays;
-                        runningInterest      += iNow;
-                        interestAccruedThisRow += iNow;
-                        monthly30DaysUsedSoFar += scaledSubDays;
-                    }
-                }
-            } else {
-                // For actual day-count, interest accrues day-by-day up to PaidOn
-                // (This block is handled in the later general accrual section for simplicity)
-            }
-            // Deduct the unscheduled payment amounts from balances
-            const principalPdU = uRowArr[8]  || 0;  // Principal Paid in unscheduled (col J)
-            const interestPdU  = uRowArr[10] || 0;  // Interest Paid in unscheduled (col L)
-            const feesDueU     = uRowArr[11] || 0;  // Fees Due in unscheduled (col M)
-            const feesPdU      = uRowArr[12] || 0;  // Fees Paid in unscheduled (col N)
-            runningFees     += feesDueU;
-            runningInterest  = Math.max(0, runningInterest - interestPdU);
-            runningPrincipal = Math.max(0, runningPrincipal - principalPdU);
-            runningFees      = Math.max(0, runningFees - feesPdU);
-
-            // *** CHANGED: Record any unscheduled principal payment for re-amortization trigger**
-            if (principalPdU > 0) {
-                unscheduledPrincipalPaidThisPeriod += principalPdU;
-            }
-
-            // Update the unscheduled row’s totals and balances (so the sheet reflects this payment)
-            uRowArr[6]  = principalPdU + interestPdU + feesPdU;           // col H: Total Paid in unscheduled payment
-            uRowArr[13] = runningInterest;                                // col O: Interest balance after payment
-            uRowArr[14] = runningPrincipal;                               // col P: Principal balance after payment
-            uRowArr[15] = runningInterest + runningPrincipal + runningFees; // col Q: Total balance after payment
-
-            // Advance subStart to the day after this unscheduled payment for further interest calc
-            subStart = oneDayAfter(paidOn);
-            unschedIndex++;
+        // If any extra principal was paid in this period (unscheduled payments), mark the flag
+        if (unscheduledPrincipalPaidThisPeriod > 0) {
+          extraPaidOccurred = true;
         }
-
-        // Accrue interest from the last subStart (after any prepayments) to the period end
-        if (runningPrincipal > 1e-6 && subStart <= periodEnd) {
-            if (isPeriodicMethod && isMonthly && Number.isInteger(periodNum) && periodNum >= 1) {
-                // Compute interest for remaining days of this 30-day period
-                let actualSubDays = calcUnpaidDays(subStart, periodEnd, params.prepaidUntil);
-                if (actualSubDays < 0) actualSubDays = 0;
-                const fractionOfMonth = actualSubDays / totalActualDaysThisPeriod;
-                let scaledSubDays = 30 * fractionOfMonth;
-                const leftover = 30 - monthly30DaysUsedSoFar;
-                if (scaledSubDays > leftover) scaledSubDays = leftover;
-                if (scaledSubDays < 0) scaledSubDays = 0;
-                if (scaledSubDays > 0) {
-                    const iEnd = runningPrincipal * dailyPeriodicRate * scaledSubDays;
-                    runningInterest      += iEnd;
-                    interestAccruedThisRow += iEnd;
-                    monthly30DaysUsedSoFar += scaledSubDays;
-                }
-            } else {
-                // Actual day-count or single-period: accrue interest day-by-day until periodEnd
-                const partialDays = calcUnpaidDays(subStart, periodEnd, params.prepaidUntil);
-                if (partialDays > 0 && runningPrincipal > 1e-6) {
-                    const iEnd = runningPrincipal * dailyRate * partialDays;
-                    runningInterest += iEnd;
-                    interestAccruedThisRow += iEnd;
-                }
-            }
-        }
-
-        // Determine this period’s due amounts (Principal/Interest Due) before considering payments
-        let newInterestDue = 0;
-        let newPrincipalDue = 0;
-        if (isSinglePeriod) {
-            // Single lump-sum loan: only final period carries all interest/principal due
-            const isFinal = (Number.isInteger(periodNum) && periodNum === params.termMonths);
-            if (isFinal) {
-                newInterestDue = runningInterest;
-                newPrincipalDue = runningPrincipal;
-            } else {
-                // Not final period (shouldn’t happen for single-period loans with interim rows)
-                newInterestDue = 0;
-                newPrincipalDue = 0;
-            }
-        }
-        else if (isMonthly && params.amortizeYN === "Yes" && Number.isInteger(periodNum) && periodNum >= 1 && periodNum <= params.termMonths) {
-            // Amortizing monthly loan: use amortized schedule unless already adjusted
-            if (unscheduledPrincipalPaidThisPeriod > 0) {
-              // **FIX**: An unscheduled principal payment was made this period – recalc interest/principal for this payment
-              runningInterest = Math.max(0, runningInterest - interestAccruedThisRow);
-              // Determine the originally scheduled payment components (interest and principal) for this period:
-              let scheduledInt, scheduledPr;
-              if (!hasReAmortized[rowIndex]) {
-                  // If this period was on the original amortization plan
-                  scheduledInt = ipmtMap[rowIndex] || 0;
-                  scheduledPr  = ppmtMap[rowIndex] || 0;
-              } else {
-                  // If this period had been re-amortized by a prior prepayment, use the last known amounts
-                  scheduledInt = rowArr[9] || 0;  // prior Interest Due (col K)
-                  scheduledPr  = rowArr[7] || 0;  // prior Principal Due (col I)
-              }
-              const scheduledPayment = scheduledInt + scheduledPr;
-              // Use actual accrued interest for this period (lower due to prepayment) as the interest due
-              let actualInterest = interestAccruedThisRow;
-              if (actualInterest > scheduledPayment) actualInterest = scheduledPayment;  // cap to total payment (edge case)
-              newInterestDue  = actualInterest;
-              // Principal due is the rest of the payment after covering interest
-              newPrincipalDue = scheduledPayment - actualInterest;
-              // Add back the interest portion to runningInterest (which will be carried until paid)
-              runningInterest += newInterestDue;
-              extraPaidOccurred = true;
-            } else if (extraPaidOccurred) {
-              // Use original payment, adjust interest/principal due
-              runningInterest = Math.max(0, runningInterest - interestAccruedThisRow);
-              const scheduledInt = ipmtMap[rowIndex] || 0;
-              const scheduledPr = ppmtMap[rowIndex] || 0;
-              const scheduledPayment = scheduledInt + scheduledPr;
-              let actualInterest = interestAccruedThisRow;
-              if (actualInterest > scheduledPayment) actualInterest = scheduledPayment;
-              newInterestDue = actualInterest;
-              newPrincipalDue = scheduledPayment - actualInterest;
-              runningInterest += newInterestDue; 
-          } else if (!hasReAmortized[rowIndex]) {
-              // No prepayment this period, use original amortization split
-              runningInterest = Math.max(0, runningInterest - interestAccruedThisRow);
-              const scheduledInt = ipmtMap[rowIndex] || 0;
-              const scheduledPr  = ppmtMap[rowIndex] || 0;
-              runningInterest += scheduledInt;
-              newInterestDue  = scheduledInt;
-              newPrincipalDue = scheduledPr;
-          } else {
-              // Already re-amortized (and no new prepayment this period), use stored values
-              runningInterest = Math.max(0, runningInterest - interestAccruedThisRow);
-              newInterestDue  = rowArr[9] || 0;
-              newPrincipalDue = rowArr[7] || 0;
-              runningInterest += newInterestDue;
-          }
-      }
-        else if (isMonthly && params.amortizeYN === "No" && Number.isInteger(periodNum) && periodNum === params.termMonths) {
-            // Interest-only loan, final period: all remaining interest and principal due at end
-            //newInterestDue = runningInterest;
-            newInterestDue = interestAccruedThisRow;
-            newPrincipalDue = runningPrincipal;
-        }
-      else if (isMonthly && params.amortizeYN === "No" 
-        && Number.isInteger(periodNum) 
-        && periodNum < params.termMonths) {
-        // Interest-only monthly loan (non-final period): set monthly interest payment
-        newInterestDue = interestAccruedThisRow;  // interest accrued this period
-        newPrincipalDue = 0;                      // no principal due until final period
-         } else {
-            // Monthly interest-only (non-final) or other cases: interest will accrue and be handled elsewhere
-            // (No principal due in regular periods if interest-only; interest handled via runningInterest)
-        }
-
-        // Update the scheduled row’s due columns with calculated amounts
-        rowArr[7] = newPrincipalDue;                   // col I: Principal Due
-        rowArr[9] = newInterestDue;                    // col K: Interest Due
-        const feesDueThisPeriod = rowArr[11] || 0;     // col M: any fee due this period
+        
+        // Determine the originally scheduled interest and principal for this period
+        const scheduledInterest = ipmtMap[rowIndex] || 0;
+        const scheduledPrincipal = ppmtMap[rowIndex] || 0;
+        // Calculate adjusted due amounts based on whether a prepayment occurred
+        const { newPrincipalDue, newInterestDue } = LoanHelpers.calculateDueAmounts(
+          periodNum,
+          rowIndex,
+          params,
+          interestAccruedThisPeriod,
+          scheduledInterest,
+          scheduledPrincipal,
+          extraPaidOccurred /* hadExtraPaymentBefore */,
+          unscheduledPrincipalPaidThisPeriod > 0 /* extraPaymentThisPeriod */,
+          hasReAmortized[rowIndex],
+          rowArr
+        );
+        // 7) Update the scheduled row’s due columns with the calculated amounts
+        rowArr[7] = newPrincipalDue; // col I: Principal Due
+        rowArr[9] = newInterestDue;  // col K: Interest Due
+        const feesDueThisPeriod = rowArr[11] || 0; // col M: any fee due this period
         runningFees += feesDueThisPeriod;
-        rowArr[5] = newPrincipalDue + newInterestDue + feesDueThisPeriod;  // col G: Payment Due (total due)
+        rowArr[5] = newPrincipalDue + newInterestDue + feesDueThisPeriod; // col G: Total Payment Due
 
-        // Apply any actual payments made in this scheduled period (reducing balances)
-        const principalPd = rowArr[8]  || 0;  // col J: Principal Paid
-        const interestPd  = rowArr[10] || 0;  // col L: Interest Paid
-        const feesPd      = rowArr[12] || 0;  // col N: Fees Paid
-        runningInterest  = Math.max(0, runningInterest - interestPd);
+        // 8) Apply any actual payments made in this scheduled period to reduce balances
+        const principalPd = rowArr[8] || 0;  // col J: Principal Paid this period
+        const interestPd = rowArr[10] || 0; // col L: Interest Paid this period
+        const feesPd = rowArr[12] || 0;     // col N: Fees Paid this period
+        runningInterest = Math.max(0, runningInterest - interestPd);
         runningPrincipal = Math.max(0, runningPrincipal - principalPd);
-        runningFees      = Math.max(0, runningFees - feesPd);
-        rowArr[6] = principalPd + interestPd + feesPd;  // col H: Total Paid in this period
+        runningFees = Math.max(0, runningFees - feesPd);
+        rowArr[6] = principalPd + interestPd + feesPd; // col H: Total Paid in this period
         if (runningPrincipal <= 1e-6) {
-          // Loan is fully repaid; no further scheduled periods needed
+          // Loan is fully repaid; mark payoff and break out of loop
           loanPaidOff = true;
+          // Set remaining periods (if any) to 0 due
+          // (This will be handled after loop by filling zeros, similar to original logic)
           break;
-      }
+        }
+     
+        // **New: mark extra payment occurrence for overpayments in scheduled rows**
+        if (principalPd > (rowArr[7] || 0)) {
+          // An extra principal overpayment was made in this scheduled period
+          extraPaidOccurred = true;
+        }
 
-        // *** CHANGED: Trigger re-amortization of future payments if any principal was paid (scheduled or unscheduled)**
-        /*if (
-            isMonthly &&
-            !isSinglePeriod &&
-            !isUnscheduledRow(rowArr) &&         // ensure this is a scheduled row
-            params.amortizeYN === "Yes" &&
-            (unscheduledPrincipalPaidThisPeriod > 0)
-        ) {
-            // Recalculate remaining schedule based on new remaining principal
-            const leftoverPrincipal = runningPrincipal;
-            const leftoverStartRow = rowIndex + 1;
-            let lastFutureRow = leftoverStartRow;
-            // Find the range of future scheduled rows to update
-            while (lastFutureRow < lastUsedRowIndex) {
-                const pVal = allRows[lastFutureRow][0];
-                if (!pVal && pVal !== 0) break;  // stop at first blank row
-                lastFutureRow++;
-            }
-            const periodsLeft = params.termMonths - Math.floor(periodNum);
-            if (periodsLeft > 0) {
-                this.reAmortizeFutureRows(
-                    allRows,
-                    leftoverStartRow,
-                    lastFutureRow,
-                    periodsLeft,
-                    leftoverPrincipal,
-                    params,
-                    hasReAmortized
-                );
-            }/*/
           // Write out ending balances for this period (Interest, Principal, Total remaining)
           rowArr[13] = runningInterest; 
           rowArr[14] = runningPrincipal;
@@ -840,22 +664,20 @@ class BalanceManager {
         }
 
         if (loanPaidOff) {
+          // Clear out any future scheduled rows beyond payoff
           for (let j = i; j < scheduledRows.length; j++) {
-              let futureRow = scheduledRows[j].rowData;
-              futureRow[7] = 0;  // Principal Due = 0
-              futureRow[9] = 0;  // Interest Due = 0
-              futureRow[5] = 0;  // Total Due = 0
+            const futureRow = scheduledRows[j].rowData;
+            futureRow[7] = 0; // Principal Due
+            futureRow[9] = 0; // Interest Due
+            futureRow[5] = 0; // Total Due
           }
-      }
-
-
-    // 9) (Optional) Handle any unscheduled payments after the final period (if needed)
-
-    // 10) Write all updated rows back to the sheet
-    scheduledRows.forEach(obj => { allRows[obj.rowIndex] = obj.rowData; });
-    unscheduledRows.forEach(obj => { allRows[obj.rowIndex] = obj.rowData; });
-    range.offset(0, 0, lastUsedRowIndex, 17).setValues(allRows.slice(0, lastUsedRowIndex));
-    SpreadsheetApp.flush();
+        }
+        // 9) (Optional) handle unscheduled payments after final period if needed (no change)
+        // 10) Write all updated rows back to the sheet
+        scheduledRows.forEach(obj => { allRows[obj.rowIndex] = obj.rowData; });
+        unscheduledRows.forEach(obj => { allRows[obj.rowIndex] = obj.rowData; });
+        range.offset(0, 0, lastUsedRowIndex, 17).setValues(allRows.slice(0, lastUsedRowIndex));
+        SpreadsheetApp.flush();
 }
 
   buildIpmtPpmtResults(schedule, lastUsedCount, params) {
