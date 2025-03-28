@@ -3,6 +3,8 @@
 ## Overview:
 LoanScript.js contains the core logic for generating and managing loan amortization schedules in Google Sheets using Google Apps Script. It defines configuration constants, helper functions for date and schedule calculations, classes to construct and recalculate loan schedules, and global functions that tie everything together. This script is designed to be used as a library in a Google Sheets project, handling calculations for loan schedules (both fully amortizing and interest-only loans), fees, and balance updates as payments are made.
 
+In the latest refactor, some core calculations have been extracted into a separate module file, LoanHelpers.js. This file contains helper functions for loan schedule processing (such as separating scheduled vs. unscheduled payments, applying prepayments, and calculating adjusted due amounts). LoanScript.js delegates those computations to the helper functions during schedule generation and recalculation. This modular design improves testability and maintainability of the code. (If you are importing the library code manually rather than via the script ID, make sure to include the LoanHelpers.js file along with LoanScript.js in your project.)
+
 ## Constants
 SHEET_CONFIG: A configuration object defining sheet layout and input/output locations. Key fields include:
 - **START_ROW / END_ROW:** The row range in the sheet where the loan schedule is output (defaults 8 to 500).
@@ -282,6 +284,8 @@ Description: Recalculates the entire loan schedule on the sheet. This is typical
     * **Update balances:** The interest balance (`runningInterest`) carries over any unpaid interest. The principal balance (`runningPrincipal`) is reduced by any principal paid. The code ensures principal never goes below 0 (floors at 0).
     * **If loan pays off early:** If a prepayment (or combination of payments) fully pays off the remaining principal **before** the end of the term, the script will zero out any subsequent scheduled periods (setting their Principal Due, Interest Due, and Total Due to 0) since the loan is now fully repaid, and it breaks out of the loop.
   * **Write back calculated values:** Updates the schedule’s cells with the newly calculated amounts and balances for each period. This includes Total Due (col G = interest due + principal due + fees due), Principal Paid/Interest Paid (if an actual payment was entered), and the Interest Balance (col O), Principal Balance (col P), and Total Balance (col Q) for each period after applying payments.
+
+Internally, the recalculation algorithm uses dedicated helper functions (from LoanHelpers.js) to perform these steps. For example, separateRows() is used to split the data into scheduled vs. unscheduled lists, applyUnscheduledPaymentsForPeriod() applies out-of-sequence payments chronologically before each period’s calculation, and calculateDueAmounts() adjusts the due interest and principal for a period if a prepayment has occurred. This modular approach does not change the behavior on the sheet, but it makes the core calculation logic easier to test and maintain.
 
 **Note:** By default, extra payments on amortizing loans will shorten the loan (you’ll pay off earlier), while the scheduled payment amounts remain unchanged. If you want to re-amortize the remaining loan after a prepayment (i.e. adjust future payment amounts to the new balance), you can use the `recastLoan()` function (described below) to recalculate the schedule for all future periods.
 

@@ -155,7 +155,12 @@ To use the wrapper properly, follow these guidelines:
 - **Save Your Script Project:**  
   Once added, save your script project.
 
-#### 2. Open/Refresh the Spreadsheet
+#### 2. Add the Loan Script Library
+
+- **Include the Library in Your Project:**
+  Follow step 4 in Installing the Script above to add the published Loan Script Library to your Apps Script project by its script ID. This makes all of the Loan Script’s classes and functions available to your project.
+
+#### 3. Open/Refresh the Spreadsheet
 
 - **Trigger the onOpen Function:**  
   After adding the wrapper, reload your Google Sheet (or reopen it) to trigger the `onOpen` function. The wrapper’s `onOpen` will automatically create a **Loan Tools** menu (labeled “Loan Schedule Tools” in the latest version) in your spreadsheet’s menu bar.
@@ -169,7 +174,7 @@ To use the wrapper properly, follow these guidelines:
   
   All options are linked to the corresponding wrapper functions. You should see this menu appear after the sheet is opened, allowing you to run the loan script features without going back to the script editor.
 
-#### 3. Generate a Loan Schedule
+#### 4. Generate a Loan Schedule
 
 - **Navigate to Your Loan Sheet:**  
   Make sure your loan sheet has inputs set up (typically in row 4).
@@ -183,7 +188,7 @@ To use the wrapper properly, follow these guidelines:
   _(On first run, you may be prompted to authorize the script to run – grant the necessary permissions.)_  
   After this step, the sheet will be filled with the calculated schedule of periods, payments, interest, balances, etc.
 
-#### 4. Record Payments and Recalculate
+#### 5. Record Payments and Recalculate
 
 - **Update the Schedule After Recording Payments:**  
   As you record actual repayments over time, use the wrapper’s recalculation function to update the schedule. Enter the payment details (e.g. Paid On date and amounts paid) in the schedule and the `onEdit()` function should automatically update the loan schedule. If it does not automatically update, you can either select “Recalculate Schedule” from the Loan Tools menu or run `recalcLoanSchedule()` in the script.
@@ -191,7 +196,7 @@ To use the wrapper properly, follow these guidelines:
 - **Recompute Balances:**  
   The wrapper will call the library’s balance manager to recompute interest accruals and remaining balances based on the payments entered. This ensures your sheet reflects all payments made and adjusts the interest and principal balances accordingly.  
 
-#### 5. Optional – Set Up Automated Triggers
+#### 6. Optional – Set Up Automated Triggers
 
 - **Automate Functions:**  
   For convenience, the wrapper provides a “Set Up Triggers” function accessible via the custom menu. Running this will configure Google Apps Script triggers to automate the running of certain functions at specified times or events. **Important: Only run this function once. Running it multiple times will result in duplicate triggers that will need to be removed via **Extensions > Apps Script > Triggers** in your Google Sheet’s script project.**
@@ -202,7 +207,7 @@ To use the wrapper properly, follow these guidelines:
 - **Trigger Management:**  
   Once you select **Set Up Triggers**, the script will create the necessary trigger(s) behind the scenes. If needed, you can later modify or remove these triggers via **Extensions > Apps Script > Triggers** in your Google Sheet’s script project.
 
-### 6. Additional Feature: Insert Unscheduled Payment Row
+### 7. Additional Feature: Insert Unscheduled Payment Row
 
 - **Log Extra Payments Easily:**  
   The wrapper’s menu includes an “Insert Unscheduled Payment Row” option. This function inserts a new row in the schedule (with the proper formatting and formulas) for an unscheduled payment. You can then fill in the **Paid On** date and amounts.
@@ -282,8 +287,8 @@ Unscheduled payment rows (inserted with the **Period** column blank) let you rec
 ### 1. Single Period Loans (One-Time Payment at Maturity)
 
 - **Interest Paid:**  
-  If you enter an interest amount in an unscheduled row for a single-period loan, it immediately reduces the accrued interest balance. The code subtracts any Interest Paid from the running interest due. This means you’re paying off interest before the maturity date, so less (or no) interest remains to be paid at final maturity. In effect, interest paid early stops interest from accumulating further on that portion.
-
+  If you enter an interest amount in an unscheduled row for a single-period loan, it immediately reduces the accrued interest balance. The code subtracts any Interest Paid from the running interest due. This means you’re paying off interest before the maturity date, so less (or no) interest remains to be paid at final maturity.
+  
 - **Principal Paid:**  
   An unscheduled principal payment lowers the outstanding principal immediately​. The script will apply that payment to reduce the loan balance, so the remaining principal due at maturity is smaller. After this prepayment, interest will only accrue on the reduced principal going forward, which directly lowers the final payment due (both principal and interest). In short, any principal paid early is a direct reduction of what you owe later.
 
