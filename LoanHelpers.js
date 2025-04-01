@@ -269,5 +269,14 @@ function calculateDueAmounts(periodNum, rowIndex, params, interestAccrued, sched
 // Export the helpers for usage in Node tests or import in other scripts
 // (In Google Apps Script, these will be available globally once this file is included)
 if (typeof module !== 'undefined' && module.exports) {
+  // Node.js export
   module.exports = { separateRows, applyUnscheduledPaymentsForPeriod, calculateDueAmounts };
+} else {
+  // Apps Script: assign functions to a global LoanHelpers object
+  if (typeof LoanHelpers === 'undefined') {
+    this.LoanHelpers = {};  // `this` refers to global in Apps Script
+  }
+  LoanHelpers.separateRows = separateRows;
+  LoanHelpers.applyUnscheduledPaymentsForPeriod = applyUnscheduledPaymentsForPeriod;
+  LoanHelpers.calculateDueAmounts = calculateDueAmounts;
 }
