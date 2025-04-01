@@ -3,3 +3,6 @@ tests/
 
 # Ignore Jest Configs
 jest.config.js
+
+# Ignore Loan Script Wrapper
+LoanScriptWrapper.js
