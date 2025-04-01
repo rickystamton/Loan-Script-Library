@@ -1,7 +1,11 @@
 // LoanHelpers.js – Helper functions for loan schedule calculations (interest, principal, prepayments)
 
+// Create the global namespace if it doesn’t already exist
+var LoanHelpers = LoanHelpers || {};
+
+
 // Calculate inclusive day count between two dates, minus any prepaid interest period.
-function daysBetweenInclusive(startDate, endDate) {
+LoanHelpers.daysBetweenInclusive = function daysBetweenInclusive(startDate, endDate) {
     const msPerDay = 24 * 60 * 60 * 1000;
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -12,7 +16,7 @@ function daysBetweenInclusive(startDate, endDate) {
     const diffDays = Math.floor((end - start) / msPerDay);
     return diffDays + 1;
   }
-  function computeAccrualDays(periodStart, periodEnd, prepaidUntil) {
+  LoanHelpers.computeAccrualDays = function computeAccrualDays(periodStart, periodEnd, prepaidUntil) {
     if (!(periodEnd instanceof Date) || isNaN(periodEnd)) {
       return 0;
     }
@@ -31,7 +35,7 @@ function daysBetweenInclusive(startDate, endDate) {
    * @param {number} count - Number of used rows in the schedule.
    * @returns {{ scheduledRows: Array, unscheduledRows: Array }}
    */
-  function separateRows(allRows, count) {
+  LoanHelpers.separateRows = function separateRows(allRows, count) {
     const scheduledRows = [];
     const unscheduledRows = [];
     for (let i = 0; i < count; i++) {
@@ -67,7 +71,7 @@ function daysBetweenInclusive(startDate, endDate) {
    * @param {number} runningFees – Current accrued fees balance at period start.
    * @returns {{ runningPrincipal: number, runningInterest: number, runningFees: number, unschedIndex: number, interestAccrued: number, unscheduledPrincipalPaid: number }}
    */
-  function applyUnscheduledPaymentsForPeriod(periodNum, periodStart, periodEnd, params, unscheduledRows, startUnschedIndex, runningPrincipal, runningInterest, runningFees) {
+  LoanHelpers.applyUnscheduledPaymentsForPeriod = function applyUnscheduledPaymentsForPeriod(periodNum, periodStart, periodEnd, params, unscheduledRows, startUnschedIndex, runningPrincipal, runningInterest, runningFees) {
     let unschedIndex = startUnschedIndex;
     let interestAccrued = 0;
     let unscheduledPrincipalPaid = 0;
@@ -198,7 +202,7 @@ function daysBetweenInclusive(startDate, endDate) {
    * @param {Array} rowData – Reference to the current row’s data array (to use prior stored due values if re-amortized).
    * @returns {{ newPrincipalDue: number, newInterestDue: number }}
    */
-  function calculateDueAmounts(periodNum, rowIndex, params, interestAccrued, scheduledInt, scheduledPr, hadExtraPaymentBefore, extraPaymentThisPeriod, wasReAmortized, rowData) {
+  LoansHelpers.calculateDueAmounts = function calculateDueAmounts(periodNum, rowIndex, params, interestAccrued, scheduledInt, scheduledPr, hadExtraPaymentBefore, extraPaymentThisPeriod, wasReAmortized, rowData) {
     let newInterestDue = 0;
     let newPrincipalDue = 0;
     const isSinglePeriod = (params.paymentFreq === "Single Period");
