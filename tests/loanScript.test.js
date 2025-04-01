@@ -89,7 +89,10 @@ describe('RowManager.handleInsertedRow', () => {
     }
     // Helper to get a cell value from the internal data store
     getCellValue(row, col) {
-      return this.data[`${row},${col}`] || null;
+      const key = `${row},${col}`;
+      return Object.prototype.hasOwnProperty.call(this.data, key)
+        ? this.data[key]
+        : null;
     }
   }
 
