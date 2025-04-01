@@ -1,0 +1,5 @@
+# Ignore the tests directory
+tests/
+
+# Ignore Jest Configs
+jest.config.js
