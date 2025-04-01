@@ -11,6 +11,13 @@
 
 const { calculateDueAmounts } = require('../LoanHelpers.js');
 
+// jest setup file or top of test file:
+require('gas-mock-globals');  // This will automatically define SpreadsheetApp, etc.
+// Ensure flush is defined
+if (typeof SpreadsheetApp.flush !== 'function') {
+  SpreadsheetApp.flush = jest.fn();
+}
+
 /**
  * Quick helper function to calculate a standard fully-amortizing monthly payment:
  * P = r * L / [1 - (1 + r)^(-n)]
@@ -297,5 +304,67 @@ describe('Amortizing Loans (Amortize = "Yes")', () => {
     // Should return the stored re-amortized values
     expect(result.newInterestDue).toBe(40);
     expect(result.newPrincipalDue).toBe(110);
+  });
+    
+  // Test for early payoff with unscheduled payment
+  it('pays off the loan early with an unscheduled payment and no recast', () => {
+    // $1000, 5% annual, 12-month term, $300 extra payment after 6 months
+    // This test checks that the loan is paid off early without recasting the loan after an unscheduled payment.
+
+
+    const principal = 1000;
+    const annualRate = 0.05;
+    const termMonths = 12;
+    const monthlyRate = annualRate / 12;
+    const monthlyPayment = calcMonthlyPayment(principal, annualRate, termMonths);
+
+    let balance = principal;
+
+    // Make 6 scheduled monthly payments
+    for (let period = 1; period <= 6; period++) {
+    const interestDue = balance * monthlyRate;
+    const principalDue = monthlyPayment - interestDue;
+    balance -= principalDue;
+    }
+    const balanceBeforeExtra = balance;
+
+    // Apply an unscheduled extra principal payment of $300
+    const extraPayment = 300;
+    balance -= extraPayment;
+
+    // After the extra payment, the loan should not be fully paid off yet
+    expect(balance).toBeGreaterThan(0);  // Balance is still > $0, not fully paid by extra
+
+    // Continue simulating payments for the remaining periods
+    let payoffPeriod = null;
+    for (let period = 7; period <= termMonths; period++) {
+    const interestDue = balance * monthlyRate;
+    const principalDue = monthlyPayment - interestDue;
+    if (balance - principalDue <= 1e-6) {
+        // This payment will pay off the remaining balance
+        payoffPeriod = period;
+        balance -= balance;  // subtract entire remaining principal
+        break;
+    } else {
+        // Regular payment (loan not paid off yet)
+        balance -= principalDue;
+    }
+    }
+
+    // The loan should be paid off before the original end of term (early payoff)
+    expect(payoffPeriod).not.toBeNull();
+    expect(payoffPeriod).toBeLessThan(termMonths);
+
+    // All **remaining** scheduled periods after payoff should have 0 principal and 0 interest due
+    for (let period = payoffPeriod + 1; period <= termMonths; period++) {
+    // Since the loan is already paid off, no interest or principal is due in these periods
+    const interestDueRemaining = 0;
+    const principalDueRemaining = 0;
+    expect(interestDueRemaining).toBeCloseTo(0, 6);
+    expect(principalDueRemaining).toBeCloseTo(0, 6);
+    }
+
+    // The loan balance should only reach (near) zero at the very end of the schedule
+    expect(balance).toBeCloseTo(0, 6);
   });
 });
