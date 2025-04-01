@@ -9,8 +9,8 @@
  *  - Re-amortization after prepayment (recasting)
  */
 
-const { calculateDueAmounts } = require('../LoanHelpers.js');
-
+const { separateRows, applyUnscheduledPaymentsForPeriod, calculateDueAmounts } = require('../LoanHelpers.js');
+const { getTotalPeriods, RowManager } = require('../LoanScript.js');
 // jest setup file or top of test file:
 require('gas-mock-globals');  // This will automatically define SpreadsheetApp, etc.
 // Ensure flush is defined
@@ -27,9 +27,10 @@ if (typeof SpreadsheetApp.flush !== 'function') {
  *     n = total number of payments
  */
 function calcMonthlyPayment(principal, annualRate, months) {
-  const monthlyRate = annualRate / 12;
-  return principal * (monthlyRate / (1 - Math.pow(1 + monthlyRate, -months)));
-}
+    const monthlyRate = annualRate / 12;
+    return principal * (monthlyRate / (1 - Math.pow(1 + monthlyRate, -months)));
+  }
+
 
 describe('Amortizing Loans (Amortize = "Yes")', () => {
   it('generates a fully amortizing schedule with zero balance at end of term', () => {
@@ -102,6 +103,33 @@ describe('Amortizing Loans (Amortize = "Yes")', () => {
 
     // After final payment, balance should be near 0
     expect(balance).toBeCloseTo(0, 6);
+  });
+
+  test('adjusts interest/principal due when an extra payment is made in the period', () => {
+    const params = { paymentFreq: "Monthly", amortizeYN: "Yes", termMonths: 5 };
+    const scheduledInt = 30;
+    const scheduledPr = 70;
+    const scheduledPayment = scheduledInt + scheduledPr; // 100
+    // Scenario 1: interest accrued less than scheduled payment
+    let result = calculateDueAmounts(3, 2, params, 20, scheduledInt, scheduledPr, false, true, false, []);
+    expect(result.newInterestDue).toBe(20);
+    expect(result.newPrincipalDue).toBe(80); // remaining part of 100
+    // Scenario 2: interest accrued exceeds scheduled payment
+    result = calculateDueAmounts(3, 2, params, 120, scheduledInt, scheduledPr, false, true, false, []);
+    expect(result.newInterestDue).toBe(scheduledPayment); // capped at 100
+    expect(result.newPrincipalDue).toBe(0);
+  });
+
+  test('adjusts payment split if a prior period had an extra payment (no new extra this period)', () => {
+    const params = { paymentFreq: "Monthly", amortizeYN: "Yes", termMonths: 5 };
+    const scheduledInt = 25;
+    const scheduledPr = 75;
+    const scheduledPayment = scheduledInt + scheduledPr; // 100
+    const result = calculateDueAmounts(4, 3, params, 40, scheduledInt, scheduledPr, true, false, false, []);
+    // Should behave like an extra payment happened previously:
+    // interest due is accrued (40, capped to 100 if needed), principal due fills remaining scheduled payment (60)
+    expect(result.newInterestDue).toBe(40);
+    expect(result.newPrincipalDue).toBe(60);
   });
 
   describe('Handling Unscheduled (Extra) Payments', () => {
@@ -368,3 +396,4 @@ describe('Amortizing Loans (Amortize = "Yes")', () => {
     expect(balance).toBeCloseTo(0, 6);
   });
 });
+}); // <-- Add this closing brace to close the inner describe block
