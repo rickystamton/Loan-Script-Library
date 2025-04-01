@@ -303,7 +303,6 @@ function getAllInputs(sheet) {
   // EXIT FEE (based on original principal, not financed)
   const originalPrincipal = sheet.getRange(SHEET_CONFIG.INPUTS.PRINCIPAL).getValue();
   inputs.exitFee = inputs.exitFeePct * originalPrincipal;
-  console.log('Inputs:', inputs);
   return inputs;
 }
 
@@ -343,7 +342,6 @@ function calcPeriodEndDate_NoProrate(closingDate, periodNum) {
       // Otherwise, use the “day-1” logic (e.g., a closing date of 15 will end on the 14th of next month).
       const m = new Date(closingDate.getFullYear(), closingDate.getMonth() + 1, day);
       m.setDate(m.getDate() - 1);
-      console.log('First Month End Date:', m);
       return m;
     }
   } else {
@@ -357,7 +355,6 @@ function calcPeriodEndDate_NoProrate(closingDate, periodNum) {
     } else {
       const t = new Date(closingDate.getFullYear(), closingDate.getMonth() + periodNum, day);
       t.setDate(t.getDate() - 1);
-      console.log('Subsequent Month End Date:', t);
       return t;
     }
   }
@@ -538,8 +535,8 @@ class BalanceManager {
     }
     if (lastUsedRowIndex === 0) return;
     // 3) Separate “scheduled” vs. “unscheduled” rows and sort them
-    logger.log('LoanHelpers:', LoanHelpers);
-    logger.log('separateRows:', LoanHelpers && LoanHelpers.separateRows);
+    console.log('LoanHelpers:', LoanHelpers);
+    console.log('separateRows:', LoanHelpers && LoanHelpers.separateRows);
     const { scheduledRows, unscheduledRows } = LoanHelpers.separateRows(allRows, lastUsedRowIndex);
     // 5) Build IPMT/PPMT results for monthly amortizing loans
     const [ipmtVals, ppmtVals] = this.buildIpmtPpmtResults(allRows, lastUsedRowIndex, params);
