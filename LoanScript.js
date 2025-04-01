@@ -538,6 +538,8 @@ class BalanceManager {
     }
     if (lastUsedRowIndex === 0) return;
     // 3) Separate “scheduled” vs. “unscheduled” rows and sort them
+    logger.log('LoanHelpers:', LoanHelpers);
+    logger.log('separateRows:', LoanHelpers && LoanHelpers.separateRows);
     const { scheduledRows, unscheduledRows } = LoanHelpers.separateRows(allRows, lastUsedRowIndex);
     // 5) Build IPMT/PPMT results for monthly amortizing loans
     const [ipmtVals, ppmtVals] = this.buildIpmtPpmtResults(allRows, lastUsedRowIndex, params);
